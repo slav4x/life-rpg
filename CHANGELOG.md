@@ -7,6 +7,14 @@
 
 ### Added
 
+- PostgreSQL + Drizzle ORM: клиент, схема `users`/`sessions`, первая миграция, репозитории.
+- Серверная проверка Telegram `initData` (HMAC-SHA256) с контролем свежести `auth_date`.
+- Allowlist Telegram ID и запрет входа для посторонних (`403`).
+- HTTP-only сессии (хранится только hash токена) и `POST /api/auth/logout`.
+- Роут `POST /api/auth/telegram`: вход, установка cookie, Zod-валидация тела, проверка `Origin`.
+- Клиентский вход через Telegram WebApp SDK на экране «Сегодня».
+- Тестовые фикстуры подписи `initData`; unit- и integration-тесты авторизации.
+- Скрипты Drizzle: `db:generate`, `db:migrate`, `db:push`, `db:studio`.
 - Каркас Next.js 16 (App Router) на TypeScript в strict-режиме.
 - Tailwind CSS v4 и shadcn/ui (Radix, neutral-палитра) с Lucide-иконками.
 - Корневой layout с настройкой viewport и safe-area под Telegram, светлая/тёмная темы.

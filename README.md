@@ -4,9 +4,9 @@
 развития: задачи, опыт, уровни, навыки, характеристики, квесты и достижения.
 Полная продуктовая и техническая спецификация — в [`SPEC.md`](./SPEC.md).
 
-> Статус: **Этап 0 — фундамент проекта**. Реализован каркас приложения,
-> тулчейн и инфраструктура. Игровая логика и Telegram-авторизация появятся на
-> следующих этапах (см. [`TASKS.md`](./TASKS.md)).
+> Статус: **Этап 1 — база и Telegram auth**. Готовы каркас, PostgreSQL + Drizzle,
+> вход через Telegram `initData` с allowlist и HTTP-only сессиями. Игровая логика
+> появится на следующих этапах (см. [`TASKS.md`](./TASKS.md)).
 
 ## Стек
 
@@ -14,7 +14,7 @@
 - **Tailwind CSS v4** + **shadcn/ui** (Radix, neutral-палитра), **Lucide** иконки
 - **Zod** — типизированная проверка окружения и валидация
 - **Vitest** + Testing Library (unit/integration), **Playwright** (e2e)
-- **PostgreSQL** + Drizzle ORM (подключаются на Этапе 1)
+- **PostgreSQL** + **Drizzle ORM** (`postgres` драйвер, `drizzle-kit` миграции)
 - **Docker Compose** + **Caddy** для self-hosted деплоя
 
 ## Требования
@@ -28,10 +28,23 @@
 ```bash
 npm install
 cp .env.example .env      # заполнить значения
+
+# PostgreSQL (пример через Docker):
+docker run -d --name life-rpg-db -p 5432:5432 \
+  -e POSTGRES_USER=life_user -e POSTGRES_PASSWORD=change-me -e POSTGRES_DB=life_rpg \
+  postgres:17-alpine
+# в .env: DATABASE_URL=postgresql://life_user:change-me@localhost:5432/life_rpg
+
+npm run db:migrate        # применить миграции
 npm run dev               # http://localhost:3000
 ```
 
 Healthcheck: [`http://localhost:3000/api/health`](http://localhost:3000/api/health).
+
+Для рантайма (dev/prod) нужны `DATABASE_URL` и — для входа — `TELEGRAM_BOT_TOKEN`
+и `ALLOWED_TELEGRAM_USER_IDS`. Экран логина работает только внутри Telegram (нужен
+`initData`); проверить поток вне Telegram можно интеграционными тестами и фикстурой
+подписи в [`tests/fixtures/telegram.ts`](./tests/fixtures/telegram.ts).
 
 ## Скрипты
 
@@ -44,8 +57,18 @@ Healthcheck: [`http://localhost:3000/api/health`](http://localhost:3000/api/heal
 | `npm run typecheck` | Проверка типов (`tsc --noEmit`)         |
 | `npm run test`      | Unit/integration тесты (Vitest)         |
 | `npm run test:e2e`  | E2E тесты (Playwright)                   |
+| `npm run db:generate` | Сгенерировать миграцию из схемы       |
+| `npm run db:migrate`  | Применить миграции                     |
+| `npm run db:studio`   | Drizzle Studio                         |
 
 Перед первым запуском Playwright установите браузеры: `npx playwright install`.
+
+Интеграционные тесты авторизации запускаются только при заданном `TEST_DATABASE_URL`
+(указывающем на **отдельную** тестовую базу — таблицы очищаются через `truncate`):
+
+```bash
+TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/life_rpg_test npm run test
+```
 
 ## Запуск в Docker
 
@@ -82,18 +105,30 @@ production `.env` живёт только на сервере с огранич�
 src/
 ├── app/
 │   ├── (mini-app)/        # экраны Mini App (Сегодня, Квесты, Навыки, ...)
-│   ├── api/health/        # healthcheck
-│   ├── layout.tsx         # корневой layout, viewport, темы
+│   ├── api/
+│   │   ├── auth/          # POST /api/auth/telegram, /api/auth/logout
+│   │   └── health/        # healthcheck
+│   ├── layout.tsx         # корневой layout, viewport, темы, Telegram SDK
 │   └── globals.css        # Tailwind + токены темы shadcn
-├── components/ui/         # компоненты shadcn/ui
-├── lib/                   # env, утилиты (auth/telegram/dates — далее)
-├── application/           # сервисы приложения (далее)
+├── components/            # ui/ (shadcn), auth/ (клиентский вход)
+├── lib/                   # env, auth (сессии/cookie), telegram, validation, http
+├── application/auth/      # сервисы: authenticate, session, logout
 ├── domain/game/           # доменные правила XP/уровней/серий (далее)
-└── db/                    # схема, миграции, репозитории (далее)
-tests/{unit,integration,e2e}/
+└── db/                    # client, schema, migrations, repositories
+tests/{unit,integration,e2e}/  # + fixtures/
 ```
 
-Полная целевая структура и границы модулей — в `SPEC.md` §14 и §8.3.
+Границы: `UI/routes → application → domain → repositories → Drizzle/PostgreSQL`.
+Правила XP/уровней/серий не пишем в React или Route Handlers. Полная целевая
+структура — в `SPEC.md` §14 и §8.3.
+
+## Авторизация
+
+`POST /api/auth/telegram` принимает `{ initData }`, проверяет HMAC-подпись bot-token'ом,
+свежесть `auth_date`, сверяет Telegram ID с `ALLOWED_TELEGRAM_USER_IDS`, upsert'ит
+пользователя и открывает серверную сессию (в БД хранится только SHA-256 hash токена),
+устанавливая HttpOnly-cookie. `POST /api/auth/logout` ревокует сессию и чистит cookie.
+Посторонний Telegram ID получает `403`, поддельный `initData` — `401`.
 
 ## Дальше
 

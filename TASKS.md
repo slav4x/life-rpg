@@ -7,7 +7,7 @@
 
 ---
 
-## Этап 0 — фундамент проекта 🚧 (текущий)
+## Этап 0 — фундамент проекта
 
 - [x] Инициализировать Next.js с TypeScript strict.
 - [x] Подключить Tailwind CSS и shadcn/ui.
@@ -34,14 +34,38 @@
 
 ---
 
-## Этап 1 — база и Telegram auth
+## Этап 1 — база и Telegram auth 🚧 (текущий)
 
-- [ ] Подключить PostgreSQL и Drizzle.
-- [ ] Создать таблицы пользователей и сессий.
-- [ ] Реализовать проверку Telegram `initData`.
-- [ ] Добавить allowlist Telegram ID.
-- [ ] Реализовать HTTP-only сессию и logout.
-- [ ] Добавить auth fixture для тестов.
+- [x] Подключить PostgreSQL и Drizzle.
+- [x] Создать таблицы пользователей и сессий.
+- [x] Реализовать проверку Telegram `initData`.
+- [x] Добавить allowlist Telegram ID.
+- [x] Реализовать HTTP-only сессию и logout.
+- [x] Добавить auth fixture для тестов.
+
+**Результат:** владелец входит из Telegram, посторонний пользователь получает `403`.
+
+### Проверено
+
+- `npm run typecheck`, `npm run lint`, `npm run build` — без ошибок.
+- `npm run test` — 18 тестов (unit: HMAC-проверка `initData`, серии/токены; integration
+  против реального PostgreSQL 17: создание user+session, отсутствие дублей при
+  повторном входе, `403` для чужого ID, ревокация сессии при logout).
+- HTTP-смоук на запущенном приложении: allowlisted → `200` + HttpOnly-cookie
+  `life_rpg_session`; чужой → `403`; поддельный `initData` → `401`; невалидное тело → `400`;
+  logout → `200`.
+
+### Заметки / trade-offs
+
+- `DATABASE_URL` и `TELEGRAM_BOT_TOKEN` теперь нужны в рантайме; в env-схеме оставлены
+  optional, чтобы `next build` не требовал секретов (в Docker — `SKIP_ENV_VALIDATION=1`).
+- Cookie `SameSite=Lax` по SPEC. В Telegram Web (desktop, cross-site iframe) Lax-cookie не
+  отправляется; на мобильных клиентах (основная цель) работает. Пересмотреть при
+  необходимости десктоп-поддержки.
+- Интеграционные тесты запускаются только при заданном `TEST_DATABASE_URL`
+  (иначе `describe.skipIf` их пропускает), поэтому `npm run test` зелёный без БД.
+- Применение миграций в проде (`drizzle-kit migrate` требует dev-зависимостей и исходников)
+  дорабатывается на Этапе 6; для dev/CI есть `npm run db:migrate`.
 
 ## Этап 2 — вертикальный игровой цикл
 
