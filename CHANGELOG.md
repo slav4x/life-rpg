@@ -13,6 +13,7 @@
 - HTTP-only сессии (хранится только hash токена) и `POST /api/auth/logout`.
 - Роут `POST /api/auth/telegram`: вход, установка cookie, Zod-валидация тела, проверка `Origin`.
 - Клиентский вход через Telegram WebApp SDK на экране «Сегодня».
+- Dev-обход авторизации (`DEV_AUTH_BYPASS`) для запуска в браузере без Telegram; активен только вне production.
 - Тестовые фикстуры подписи `initData`; unit- и integration-тесты авторизации.
 - Скрипты Drizzle: `db:generate`, `db:migrate`, `db:push`, `db:studio`.
 - Каркас Next.js 16 (App Router) на TypeScript в strict-режиме.

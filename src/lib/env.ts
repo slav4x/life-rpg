@@ -36,6 +36,11 @@ export const envSchema = z.object({
 
   // Locale
   DEFAULT_TIMEZONE: z.string().min(1).default("Asia/Novosibirsk"),
+
+  // Development-only: skip Telegram and sign in a mock user. Ignored in production.
+  DEV_AUTH_BYPASS: z.string().optional(),
+  DEV_TELEGRAM_ID: z.coerce.number().int().positive().optional(),
+  DEV_FIRST_NAME: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -66,6 +71,15 @@ const skipValidation =
 export const env: Env = skipValidation
   ? (process.env as unknown as Env)
   : parseEnv();
+
+/**
+ * Whether the development Telegram auth bypass is active. Requires the explicit
+ * flag AND a non-production environment, so it can never leak into production.
+ */
+export function isDevAuthBypassEnabled(source: Env = env): boolean {
+  const value = source.DEV_AUTH_BYPASS?.toLowerCase();
+  return (value === "1" || value === "true") && source.NODE_ENV !== "production";
+}
 
 /** Parsed allowlist of Telegram user IDs (empty until configured). */
 export function getAllowedTelegramUserIds(source: Env = env): bigint[] {

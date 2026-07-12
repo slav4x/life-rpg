@@ -41,10 +41,24 @@ npm run dev               # http://localhost:3000
 
 Healthcheck: [`http://localhost:3000/api/health`](http://localhost:3000/api/health).
 
-Для рантайма (dev/prod) нужны `DATABASE_URL` и — для входа — `TELEGRAM_BOT_TOKEN`
-и `ALLOWED_TELEGRAM_USER_IDS`. Экран логина работает только внутри Telegram (нужен
-`initData`); проверить поток вне Telegram можно интеграционными тестами и фикстурой
-подписи в [`tests/fixtures/telegram.ts`](./tests/fixtures/telegram.ts).
+Для рантайма нужен `DATABASE_URL`. Реальный вход через Telegram требует
+`TELEGRAM_BOT_TOKEN` и `ALLOWED_TELEGRAM_USER_IDS`.
+
+### Разработка без Telegram
+
+Чтобы открыть приложение в обычном браузере без бота, включите dev-обход в `.env`:
+
+```env
+DEV_AUTH_BYPASS=1
+DEV_FIRST_NAME=Slava   # необязательно
+DEV_TELEGRAM_ID=424242 # необязательно
+```
+
+Затем `npm run dev` и откройте http://localhost:3000 — приложение автоматически
+войдёт под мок-пользователем (создаётся реальная строка в БД и сессия). Обход
+работает **только** в development (`npm run dev`) и полностью игнорируется в
+production-сборке, поэтому в прод протечь не может. Telegram-бот для этого не нужен,
+но PostgreSQL — нужен.
 
 ## Скрипты
 

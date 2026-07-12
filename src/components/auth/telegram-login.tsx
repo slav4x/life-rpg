@@ -34,7 +34,20 @@ export function TelegramLogin() {
     async function run() {
       telegramReady();
       const initData = getTelegramInitData();
+
       if (!initData) {
+        // Outside Telegram: fall back to the dev bypass. The endpoint returns
+        // 404 unless DEV_AUTH_BYPASS is enabled on a non-production server.
+        try {
+          const res = await fetch("/api/auth/dev-login", { method: "POST" });
+          if (cancelled) return;
+          if (res.ok) {
+            router.refresh();
+            return;
+          }
+        } catch {
+          // ignore and fall through to the "unavailable" message
+        }
         if (!cancelled) setState("unavailable");
         return;
       }
