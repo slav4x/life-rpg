@@ -52,7 +52,14 @@ export type Env = z.infer<typeof envSchema>;
 export function parseEnv(
   source: Record<string, string | undefined> = process.env,
 ): Env {
-  const parsed = envSchema.safeParse(source);
+  // Treat empty strings (e.g. `TELEGRAM_BOT_TOKEN=` in .env) as "unset" so
+  // optional fields fall back to undefined / their defaults.
+  const normalized: Record<string, string | undefined> = {};
+  for (const [key, value] of Object.entries(source)) {
+    normalized[key] = value === "" ? undefined : value;
+  }
+
+  const parsed = envSchema.safeParse(normalized);
 
   if (!parsed.success) {
     const details = parsed.error.issues

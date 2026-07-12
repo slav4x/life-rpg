@@ -23,6 +23,17 @@ describe("parseEnv", () => {
     expect(env.SESSION_TTL_DAYS).toBe(45);
   });
 
+  it("treats empty strings as unset", () => {
+    const env = parseEnv({
+      TELEGRAM_BOT_TOKEN: "",
+      ALLOWED_TELEGRAM_USER_IDS: "",
+      SESSION_TTL_DAYS: "",
+    });
+
+    expect(env.TELEGRAM_BOT_TOKEN).toBeUndefined();
+    expect(env.SESSION_TTL_DAYS).toBe(30);
+  });
+
   it("rejects an invalid APP_URL", () => {
     expect(() => parseEnv({ APP_URL: "not-a-url" })).toThrow(
       /Invalid environment variables/,
