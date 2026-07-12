@@ -35,7 +35,7 @@ describe.skipIf(!url)("authenticateWithTelegram (integration)", () => {
   });
 
   beforeAll(async () => {
-    client = postgres(url!, { max: 1 });
+    client = postgres(url!, { max: 1, onnotice: () => {} });
     db = drizzle(client, { schema });
     await migrate(db, { migrationsFolder: "./src/db/migrations" });
     await db.execute(

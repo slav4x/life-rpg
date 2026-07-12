@@ -7,6 +7,14 @@ import * as schema from "./schema";
 
 export type Database = PostgresJsDatabase<typeof schema>;
 
+/** A transaction handle, structurally usable anywhere a `Database` is. */
+export type Transaction = Parameters<
+  Parameters<Database["transaction"]>[0]
+>[0];
+
+/** Accepted by repositories so they work both standalone and inside a tx. */
+export type DbClient = Database | Transaction;
+
 let sql: ReturnType<typeof postgres> | undefined;
 let database: Database | undefined;
 

@@ -17,6 +17,9 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./tests/setup.ts"],
+    // Integration tests share one database and run migrations, so keep test
+    // files sequential to avoid races on the shared schema.
+    fileParallelism: false,
     include: [
       "tests/unit/**/*.{test,spec}.{ts,tsx}",
       "tests/integration/**/*.{test,spec}.{ts,tsx}",

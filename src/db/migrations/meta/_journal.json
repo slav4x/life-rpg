@@ -8,6 +8,20 @@
       "when": 1783885716090,
       "tag": "0000_lying_layla_miller",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783887241010,
+      "tag": "0001_fat_nextwave",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783887580499,
+      "tag": "0002_seed_attributes",
+      "breakpoints": true
     }
   ]
 }

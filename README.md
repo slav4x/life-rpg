@@ -4,9 +4,10 @@
 развития: задачи, опыт, уровни, навыки, характеристики, квесты и достижения.
 Полная продуктовая и техническая спецификация — в [`SPEC.md`](./SPEC.md).
 
-> Статус: **Этап 1 — база и Telegram auth**. Готовы каркас, PostgreSQL + Drizzle,
-> вход через Telegram `initData` с allowlist и HTTP-only сессиями. Игровая логика
-> появится на следующих этапах (см. [`TASKS.md`](./TASKS.md)).
+> Статус: **Этап 2 — вертикальный игровой цикл**. К базе и Telegram-авторизации
+> добавлены характеристики, навыки, разовые задачи, транзакционное начисление XP
+> и экран «Сегодня». Повторения/серии, квесты и достижения — далее
+> (см. [`TASKS.md`](./TASKS.md)).
 
 ## Стек
 
@@ -124,10 +125,10 @@ src/
 │   │   └── health/        # healthcheck
 │   ├── layout.tsx         # корневой layout, viewport, темы, Telegram SDK
 │   └── globals.css        # Tailwind + токены темы shadcn
-├── components/            # ui/ (shadcn), auth/ (клиентский вход)
-├── lib/                   # env, auth (сессии/cookie), telegram, validation, http
-├── application/auth/      # сервисы: authenticate, session, logout
-├── domain/game/           # доменные правила XP/уровней/серий (далее)
+├── components/            # ui/ (shadcn), auth/, today/ (экран «Сегодня»)
+├── lib/                   # env, auth, telegram, validation, http, dates
+├── application/           # auth, tasks, skills, game (today, bootstrap)
+├── domain/game/           # calculate-level, calculate-xp, constants
 └── db/                    # client, schema, migrations, repositories
 tests/{unit,integration,e2e}/  # + fixtures/
 ```
@@ -143,6 +144,21 @@ tests/{unit,integration,e2e}/  # + fixtures/
 пользователя и открывает серверную сессию (в БД хранится только SHA-256 hash токена),
 устанавливая HttpOnly-cookie. `POST /api/auth/logout` ревокует сессию и чистит cookie.
 Посторонний Telegram ID получает `403`, поддельный `initData` — `401`.
+
+## Игровой цикл (Этап 2)
+
+Реальное действие → задача → выполнение → XP. При завершении задачи сервер в одной
+транзакции считает `finalXp = round(baseXp × множитель_сложности)` и пишет три записи
+в журнал `xp_transactions`: 100% в общий уровень, 100% в навык, 25% в характеристику
+навыка. Кэши `user_skills` / `user_attributes` обновляются там же; общий уровень
+считается из журнала по формуле `100 × level²` ([`domain/game`](./src/domain/game)).
+
+- `POST /api/tasks` — создать разовое действие.
+- `POST /api/tasks/:id/complete` — завершить (идемпотентно по `Idempotency-Key`).
+- `GET`/`POST /api/skills` — список и создание навыков.
+
+Экран «Сегодня» показывает уровень с прогрессом, XP за день, список задач и результат
+начисления (toast). XP с клиента не принимается — считается только на сервере.
 
 ## Дальше
 
