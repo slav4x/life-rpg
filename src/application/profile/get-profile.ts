@@ -4,7 +4,7 @@ import {
   listUserAchievements,
 } from "@/db/repositories/achievements";
 import { attributeDistribution } from "@/db/repositories/progress";
-import { listActiveSkills } from "@/db/repositories/skills";
+import { listSkills } from "@/db/repositories/skills";
 import { listTemplates } from "@/db/repositories/task-templates";
 import { sumGlobalXp } from "@/db/repositories/xp";
 import {
@@ -43,6 +43,8 @@ export interface ProfileTemplate {
   endsOn: string | null;
   isActive: boolean;
   archived: boolean;
+  skillName: string;
+  skillArchived: boolean;
 }
 
 export interface ProfileSkillOption {
@@ -64,19 +66,20 @@ export async function getProfileData(
   userId: string,
   db: DbClient = getDb(),
 ): Promise<ProfileData> {
-  const [totalXp, attributes, allAchievements, userAchievements, templates, skills] =
+  const [totalXp, attributes, allAchievements, userAchievements, templates, allSkills] =
     await Promise.all([
       sumGlobalXp(db, userId),
       attributeDistribution(db, userId),
       listAchievements(db),
       listUserAchievements(db, userId),
       listTemplates(db, userId),
-      listActiveSkills(db, userId),
+      listSkills(db, userId),
     ]);
 
   const unlockedById = new Map(
     userAchievements.map((item) => [item.achievementId, item.unlockedAt]),
   );
+  const skillsById = new Map(allSkills.map((skill) => [skill.id, skill]));
 
   return {
     totalXp,
@@ -90,21 +93,28 @@ export async function getProfileData(
       unlocked: unlockedById.has(a.id),
       unlockedAt: unlockedById.get(a.id)?.toISOString() ?? null,
     })),
-    templates: templates.map((t) => ({
-      id: t.id,
-      title: t.title,
-      skillId: t.skillId,
-      baseXp: t.baseXp,
-      difficulty: t.difficulty,
-      description: t.description,
-      recurrenceType: t.recurrenceType,
-      weekdays: t.weekdays,
-      estimatedMinutes: t.estimatedMinutes,
-      startsOn: t.startsOn,
-      endsOn: t.endsOn,
-      isActive: t.isActive,
-      archived: t.archivedAt !== null,
-    })),
-    skills: skills.map((s) => ({ id: s.id, name: s.name })),
+    templates: templates.map((template) => {
+      const skill = skillsById.get(template.skillId);
+      return {
+        id: template.id,
+        title: template.title,
+        skillId: template.skillId,
+        baseXp: template.baseXp,
+        difficulty: template.difficulty,
+        description: template.description,
+        recurrenceType: template.recurrenceType,
+        weekdays: template.weekdays,
+        estimatedMinutes: template.estimatedMinutes,
+        startsOn: template.startsOn,
+        endsOn: template.endsOn,
+        isActive: template.isActive,
+        archived: template.archivedAt !== null,
+        skillName: skill?.name ?? "Удалённый навык",
+        skillArchived: skill?.status !== "active",
+      };
+    }),
+    skills: allSkills
+      .filter((skill) => skill.status === "active")
+      .map((skill) => ({ id: skill.id, name: skill.name })),
   };
 }

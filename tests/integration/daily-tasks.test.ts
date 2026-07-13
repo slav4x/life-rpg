@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ensureTasksForDate } from "@/application/tasks/ensure-daily-tasks";
 import { getPlanningSummary } from "@/application/tasks/planning";
 import { createUserTemplate } from "@/application/templates/create-template";
+import { updateUserTemplate } from "@/application/templates/manage-template";
 import { ensureAttributes, listAttributes } from "@/db/repositories/attributes";
 import { createSkill } from "@/db/repositories/skills";
 import {
@@ -219,5 +220,19 @@ describe.skipIf(!url)("ensureTasksForDate (integration)", () => {
       db,
     );
     expect(replacement.archivedAt).toBeNull();
+
+    await expect(
+      updateUserTemplate(userId, template.id, { isActive: true }, db),
+    ).rejects.toMatchObject({ code: "duplicate_template", status: 409 });
+
+    const restored = await updateUserTemplate(
+      userId,
+      template.id,
+      { title: "Разминка", isActive: true },
+      db,
+    );
+    expect(restored.title).toBe("Разминка");
+    expect(restored.isActive).toBe(true);
+    expect(restored.archivedAt).toBeNull();
   });
 });

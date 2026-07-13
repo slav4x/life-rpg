@@ -26,6 +26,7 @@ export const updateSkillInputSchema = z
     attributeCode: attributeCode.optional(),
     icon: z.enum(SKILL_ICONS).nullable().optional(),
     color: z.enum(SKILL_COLORS).nullable().optional(),
+    status: z.literal("active").optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "empty update" });
 

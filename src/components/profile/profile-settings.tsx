@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, LogOut, Pencil, Upload } from "lucide-react";
+import { Download, LogOut, Pencil, RotateCcw, Upload } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { type ChangeEvent, useState } from "react";
@@ -77,6 +77,10 @@ export function ProfileSettings({
   const [tz, setTz] = useState(timezone);
   const [savedTz, setSavedTz] = useState(timezone);
   const [busy, setBusy] = useState(false);
+  const [templateRename, setTemplateRename] = useState<{
+    id: string;
+    value: string;
+  } | null>(null);
 
   const timezoneOptions = TIMEZONES.includes(tz) ? TIMEZONES : [tz, ...TIMEZONES];
   const active = templates.filter((t) => !t.archived);
@@ -155,6 +159,49 @@ export function ProfileSettings({
         toast.success("Шаблон архивирован");
         router.refresh();
       }
+    } catch {
+      toast.error(NETWORK_ERROR_MESSAGE);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function restoreTemplate(template: ProfileTemplate, title?: string) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/task-templates/${template.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          isActive: true,
+          ...(title ? { title: title.trim() } : {}),
+        }),
+      });
+      const payload = (await res.clone().json().catch(() => ({}))) as {
+        error?: string;
+      };
+      if (!res.ok) {
+        if (payload.error === "duplicate_template") {
+          const suffix = " (восстановлен)";
+          setTemplateRename({
+            id: template.id,
+            value:
+              title?.trim() ||
+              `${template.title.slice(0, 200 - suffix.length)}${suffix}`,
+          });
+          toast.error("Название шаблона уже занято", {
+            description: "Измените название и повторите восстановление.",
+          });
+        } else {
+          toast.error(
+            await getApiErrorMessage(res, "Не удалось восстановить шаблон."),
+          );
+        }
+        return;
+      }
+      setTemplateRename(null);
+      toast.success("Шаблон восстановлен и активирован");
+      router.refresh();
     } catch {
       toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
@@ -356,15 +403,73 @@ export function ProfileSettings({
         )}
 
         {archived.length > 0 && (
-          <details className="text-sm text-muted-foreground">
-            <summary className="flex min-h-11 cursor-pointer items-center">
+          <details className="rounded-xl border px-3 text-sm">
+            <summary className="flex min-h-11 cursor-pointer items-center font-medium">
               Архив ({archived.length})
             </summary>
-            <ul className="mt-2 flex flex-col gap-1">
+            <ul className="flex flex-col gap-2 pb-3">
               {archived.map((t) => (
-                <li key={t.id} className="flex justify-between px-1 text-xs">
-                  <span className="truncate">{t.title}</span>
-                  <span>{scheduleLabel(t)}</span>
+                <li
+                  key={t.id}
+                  data-archived-template
+                  className="flex flex-col gap-2 rounded-xl border bg-card px-3 py-2.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="truncate text-sm font-medium">{t.title}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {scheduleLabel(t)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Навык: {t.skillName}
+                  </p>
+                  {t.skillArchived ? (
+                    <p className="text-xs text-muted-foreground">
+                      Сначала восстановите связанный навык в разделе «Навыки».
+                    </p>
+                  ) : templateRename?.id === t.id ? (
+                    <div className="flex flex-col gap-2">
+                      <p className="text-xs text-destructive">
+                        Неархивный шаблон с таким названием уже существует.
+                      </p>
+                      <Input
+                        aria-label={`Новое название шаблона ${t.title}`}
+                        value={templateRename.value}
+                        maxLength={200}
+                        onChange={(event) =>
+                          setTemplateRename({ id: t.id, value: event.target.value })
+                        }
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          disabled={busy || !templateRename.value.trim()}
+                          onClick={() => restoreTemplate(t, templateRename.value)}
+                        >
+                          Переименовать и восстановить
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() => setTemplateRename(null)}
+                        >
+                          Отмена
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="self-start"
+                      disabled={busy}
+                      onClick={() => restoreTemplate(t)}
+                    >
+                      <RotateCcw className="size-4" />
+                      Восстановить
+                    </Button>
+                  )}
                 </li>
               ))}
             </ul>

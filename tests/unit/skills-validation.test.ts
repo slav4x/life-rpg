@@ -22,4 +22,13 @@ describe("skill input validation", () => {
       updateSkillInputSchema.safeParse({ icon: "<svg>", color: "red" }).success,
     ).toBe(false);
   });
+
+  it("allows only activation as a status update", () => {
+    expect(updateSkillInputSchema.safeParse({ status: "active" }).success).toBe(
+      true,
+    );
+    expect(
+      updateSkillInputSchema.safeParse({ status: "archived" }).success,
+    ).toBe(false);
+  });
 });

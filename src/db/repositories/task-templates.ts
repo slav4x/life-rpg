@@ -145,3 +145,29 @@ export async function archiveTemplate(
     .returning();
   return template;
 }
+
+export async function restoreTemplate(
+  db: DbClient,
+  userId: string,
+  id: string,
+  title?: string,
+): Promise<TaskTemplate | undefined> {
+  const now = new Date();
+  const [template] = await db
+    .update(taskTemplates)
+    .set({
+      ...(title !== undefined ? { title } : {}),
+      isActive: true,
+      archivedAt: null,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(taskTemplates.id, id),
+        eq(taskTemplates.userId, userId),
+        eq(taskTemplates.isActive, false),
+      ),
+    )
+    .returning();
+  return template;
+}

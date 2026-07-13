@@ -1,6 +1,9 @@
 import { getDb } from "@/db/client";
 import { listAttributes } from "@/db/repositories/attributes";
-import { listActiveSkillsWithXp } from "@/db/repositories/skills";
+import {
+  listActiveSkillsWithXp,
+  listArchivedSkillsWithXp,
+} from "@/db/repositories/skills";
 import { levelProgress, type LevelProgress } from "@/domain/game/calculate-level";
 
 export interface SkillOverviewItem {
@@ -16,6 +19,10 @@ export interface AttributeGroup {
   code: string;
   name: string;
   skills: SkillOverviewItem[];
+}
+
+export interface ArchivedSkillOverviewItem extends SkillOverviewItem {
+  attributeName: string;
 }
 
 /** Active skills grouped by attribute, with level and progress (SPEC §6.5). */
@@ -45,4 +52,27 @@ export async function getSkillsOverview(
   return attrs
     .map((a) => ({ code: a.code, name: a.name, skills: byAttribute.get(a.id) ?? [] }))
     .filter((group) => group.skills.length > 0);
+}
+
+export async function getArchivedSkillsOverview(
+  userId: string,
+): Promise<ArchivedSkillOverviewItem[]> {
+  const db = getDb();
+  const [attributes, skills] = await Promise.all([
+    listAttributes(db),
+    listArchivedSkillsWithXp(db, userId),
+  ]);
+  const attributeNames = new Map(
+    attributes.map((attribute) => [attribute.id, attribute.name]),
+  );
+
+  return skills.map(({ skill, xp }) => ({
+    id: skill.id,
+    name: skill.name,
+    icon: skill.icon,
+    color: skill.color,
+    xp,
+    level: levelProgress(xp),
+    attributeName: attributeNames.get(skill.attributeId) ?? "Без характеристики",
+  }));
 }

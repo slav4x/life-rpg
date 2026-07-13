@@ -55,6 +55,17 @@ export async function listActiveSkills(
     .orderBy(asc(skills.name));
 }
 
+export async function listSkills(
+  db: DbClient,
+  userId: string,
+): Promise<Skill[]> {
+  return db
+    .select()
+    .from(skills)
+    .where(eq(skills.userId, userId))
+    .orderBy(asc(skills.name));
+}
+
 export async function countSkills(
   db: DbClient,
   userId: string,
@@ -101,6 +112,23 @@ export async function listActiveSkillsWithXp(
   return rows.map((r) => ({ skill: r.skill, xp: r.xp ?? 0 }));
 }
 
+/** Archived skills with their cached XP, used by the restore UI. */
+export async function listArchivedSkillsWithXp(
+  db: DbClient,
+  userId: string,
+): Promise<SkillWithXp[]> {
+  const rows = await db
+    .select({ skill: skills, xp: userSkills.xp })
+    .from(skills)
+    .leftJoin(
+      userSkills,
+      and(eq(userSkills.skillId, skills.id), eq(userSkills.userId, userId)),
+    )
+    .where(and(eq(skills.userId, userId), eq(skills.status, "archived")))
+    .orderBy(asc(skills.name));
+  return rows.map((row) => ({ skill: row.skill, xp: row.xp ?? 0 }));
+}
+
 export interface UpdateSkillFields {
   name?: string;
   description?: string | null;
@@ -134,6 +162,32 @@ export async function archiveSkill(
     .update(skills)
     .set({ status: "archived", archivedAt: now, updatedAt: now })
     .where(and(eq(skills.id, id), eq(skills.userId, userId)))
+    .returning();
+  return skill;
+}
+
+export async function restoreSkill(
+  db: DbClient,
+  userId: string,
+  id: string,
+  fields: UpdateSkillFields = {},
+): Promise<Skill | undefined> {
+  const now = new Date();
+  const [skill] = await db
+    .update(skills)
+    .set({
+      ...fields,
+      status: "active",
+      archivedAt: null,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(skills.id, id),
+        eq(skills.userId, userId),
+        eq(skills.status, "archived"),
+      ),
+    )
     .returning();
   return skill;
 }

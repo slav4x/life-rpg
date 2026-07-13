@@ -5,6 +5,7 @@ import { listAttributes } from "@/db/repositories/attributes";
 import {
   archiveSkill,
   getSkillById,
+  restoreSkill,
   updateSkill,
   type UpdateSkillFields,
 } from "@/db/repositories/skills";
@@ -18,6 +19,7 @@ export interface UpdateSkillCommand {
   attributeCode?: string;
   icon?: string | null;
   color?: string | null;
+  status?: "active";
 }
 
 export async function updateUserSkill(
@@ -58,7 +60,14 @@ export async function updateUserSkill(
 
   let skill: Skill | undefined;
   try {
-    skill = await updateSkill(db, userId, id, fields);
+    if (current.status === "archived") {
+      if (cmd.status !== "active") {
+        throw new GameError("skill_archived", "Restore skill before editing");
+      }
+      skill = await restoreSkill(db, userId, id, fields);
+    } else {
+      skill = await updateSkill(db, userId, id, fields);
+    }
   } catch (error) {
     if (isUniqueConstraintViolation(error, "skills_user_active_name_unique")) {
       throw new GameError("duplicate_skill", "Active skill name already exists");

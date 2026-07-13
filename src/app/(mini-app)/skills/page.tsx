@@ -1,5 +1,8 @@
 import { getAuthenticatedUser } from "@/application/auth/session";
-import { getSkillsOverview } from "@/application/skills/skills-overview";
+import {
+  getArchivedSkillsOverview,
+  getSkillsOverview,
+} from "@/application/skills/skills-overview";
 import { SkillsScreen } from "@/components/skills/skills-screen";
 
 export default async function SkillsPage() {
@@ -12,6 +15,9 @@ export default async function SkillsPage() {
     );
   }
 
-  const groups = await getSkillsOverview(user.id);
-  return <SkillsScreen groups={groups} />;
+  const [groups, archived] = await Promise.all([
+    getSkillsOverview(user.id),
+    getArchivedSkillsOverview(user.id),
+  ]);
+  return <SkillsScreen groups={groups} archived={archived} />;
 }

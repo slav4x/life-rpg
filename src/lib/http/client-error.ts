@@ -23,6 +23,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   duplicate_skill: "Активный навык с таким названием уже существует.",
   duplicate_template: "Неархивный шаблон с таким названием уже существует.",
   skill_not_found: "Навык не найден или находится в архиве.",
+  skill_archived: "Сначала восстановите навык, связанный с шаблоном.",
   attribute_not_found: "Характеристика не найдена.",
   invalid_format: "Версия или формат файла не поддерживается.",
   account_not_empty: "В профиле уже есть данные.",

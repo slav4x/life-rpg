@@ -128,6 +128,103 @@ test("creates and customizes a skill before earning XP", async ({ page }) => {
   await expect(page.getByText("Разум", { exact: true })).toBeVisible();
 });
 
+test("restores an archived skill after resolving a name conflict", async ({ page }) => {
+  const title = `E2E архив ${Date.now()}`;
+  const restoredTitle = `${title} новый`;
+
+  async function createSkill() {
+    await page.getByRole("button", { name: "Навык" }).click();
+    const dialog = page.getByRole("dialog", { name: "Новый навык" });
+    await dialog.getByLabel("Название").fill(title);
+    await dialog.getByRole("button", { name: "Создать" }).click();
+  }
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Привет/ })).toBeVisible({
+    timeout: 15000,
+  });
+  await page.getByRole("link", { name: "Навыки" }).click();
+  await createSkill();
+
+  await page.getByRole("link", { name: new RegExp(title) }).click();
+  await page.getByRole("button", { name: "Архивировать" }).first().click();
+  await page.getByRole("button", { name: "Архивировать" }).last().click();
+  await expect(page.getByRole("heading", { name: "Навыки" })).toBeVisible();
+
+  await createSkill();
+  await page.locator("summary").filter({ hasText: "Архив" }).click();
+  const archivedCard = page
+    .locator("[data-archived-skill]")
+    .filter({ hasText: title });
+  await archivedCard.getByRole("button", { name: "Восстановить" }).click();
+  await expect(
+    archivedCard.getByText("Активный навык с таким названием уже существует."),
+  ).toBeVisible();
+  await archivedCard.getByLabel(`Новое название для ${title}`).fill(restoredTitle);
+  await archivedCard
+    .getByRole("button", { name: "Переименовать и восстановить" })
+    .click();
+
+  await expect(page.getByRole("link", { name: new RegExp(restoredTitle) })).toBeVisible();
+});
+
+test("restores an archived template after resolving a title conflict", async ({
+  page,
+}) => {
+  const title = `E2E шаблон ${Date.now()}`;
+  const restoredTitle = `${title} новый`;
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Привет/ })).toBeVisible({
+    timeout: 15000,
+  });
+  await page.evaluate(async (templateTitle) => {
+    const skillsResponse = await fetch("/api/skills");
+    const skills = (await skillsResponse.json()) as { skills: Array<{ id: string }> };
+    const skillId = skills.skills[0]?.id;
+    if (!skillId) throw new Error("No active skill for E2E template");
+
+    const body = {
+      title: templateTitle,
+      skillId,
+      baseXp: 20,
+      difficulty: "normal",
+      recurrenceType: "daily",
+      localDate: "2026-07-13",
+    };
+    const createdResponse = await fetch("/api/task-templates", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const created = (await createdResponse.json()) as { template: { id: string } };
+    await fetch(`/api/task-templates/${created.template.id}`, { method: "DELETE" });
+    await fetch("/api/task-templates", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...body, title: ` ${templateTitle.toUpperCase()} ` }),
+    });
+  }, title);
+
+  await page.getByRole("link", { name: "Профиль" }).click();
+  await page.locator("summary").filter({ hasText: "Архив" }).click();
+  const archivedCard = page
+    .locator("[data-archived-template]")
+    .filter({ hasText: title });
+  await archivedCard.getByRole("button", { name: "Восстановить" }).click();
+  await expect(
+    archivedCard.getByText("Неархивный шаблон с таким названием уже существует."),
+  ).toBeVisible();
+  await archivedCard
+    .getByLabel(`Новое название шаблона ${title}`)
+    .fill(restoredTitle);
+  await archivedCard
+    .getByRole("button", { name: "Переименовать и восстановить" })
+    .click();
+
+  await expect(page.getByText(restoredTitle, { exact: true })).toBeVisible();
+});
+
 test("imports a content pack and reports conflicts", async ({ page }) => {
   const suffix = Date.now();
   const skillName = `E2E контент ${suffix}`;

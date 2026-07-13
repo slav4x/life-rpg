@@ -9,6 +9,7 @@ import {
   updateUserSkill,
 } from "@/application/skills/manage-skill";
 import { createUserSkill } from "@/application/skills/create-skill";
+import { updateUserTemplate } from "@/application/templates/manage-template";
 import { completeTask } from "@/application/tasks/complete-task";
 import { revertTask } from "@/application/tasks/revert-task";
 import { ensureAttributes, listAttributes } from "@/db/repositories/attributes";
@@ -121,6 +122,20 @@ describe.skipIf(!url)("skill management (integration)", () => {
       .where(eq(taskTemplates.id, template.id));
     expect(t.isActive).toBe(false);
     expect(t.archivedAt).not.toBeNull();
+
+    await expect(
+      updateUserTemplate(userId, template.id, { isActive: true }, db),
+    ).rejects.toMatchObject({ code: "skill_archived" });
+
+    await updateUserSkill(userId, skillId, { status: "active" }, db);
+    const restoredTemplate = await updateUserTemplate(
+      userId,
+      template.id,
+      { isActive: true },
+      db,
+    );
+    expect(restoredTemplate.archivedAt).toBeNull();
+    expect(restoredTemplate.isActive).toBe(true);
   });
 
   it("rejects a duplicate active skill name but allows reuse after archive", async () => {
@@ -136,10 +151,27 @@ describe.skipIf(!url)("skill management (integration)", () => {
     ).rejects.toMatchObject({ code: "duplicate_skill", status: 409 });
 
     await archiveUserSkill(userId, skillId, db);
+    await expect(
+      updateUserSkill(userId, skillId, { name: "Backend" }, db),
+    ).rejects.toMatchObject({ code: "skill_archived" });
     const replacement = await createUserSkill(
       { userId, name: "FRONTEND", attributeCode: "mind" },
       db,
     );
     expect(replacement.status).toBe("active");
+
+    await expect(
+      updateUserSkill(userId, skillId, { status: "active" }, db),
+    ).rejects.toMatchObject({ code: "duplicate_skill", status: 409 });
+
+    const restored = await updateUserSkill(
+      userId,
+      skillId,
+      { status: "active", name: "Backend" },
+      db,
+    );
+    expect(restored.status).toBe("active");
+    expect(restored.archivedAt).toBeNull();
+    expect(restored.name).toBe("Backend");
   });
 });

@@ -1,10 +1,12 @@
 import { GameError } from "@/application/game/errors";
 import { getDb, type Database } from "@/db/client";
 import { isUniqueConstraintViolation } from "@/db/errors";
+import { getSkillById } from "@/db/repositories/skills";
 import {
   archiveTemplate,
   getTemplateById,
   listTemplates,
+  restoreTemplate,
   updateTemplate,
   type UpdateTemplateFields,
 } from "@/db/repositories/task-templates";
@@ -33,6 +35,22 @@ export async function updateUserTemplate(
       const current = await getTemplateById(tx, userId, id);
       if (!current) {
         throw new GameError("template_not_found", "Template not found");
+      }
+      if (current.archivedAt) {
+        const restoresOnly = Object.keys(normalized).every(
+          (key) => key === "title" || key === "isActive",
+        );
+        if (normalized.isActive !== true || !restoresOnly) {
+          throw new GameError(
+            "invalid_input",
+            "Archived template can only be restored or renamed",
+          );
+        }
+        const skill = await getSkillById(tx, userId, current.skillId);
+        if (!skill || skill.status !== "active") {
+          throw new GameError("skill_archived", "Restore template skill first");
+        }
+        return restoreTemplate(tx, userId, id, normalized.title);
       }
       const startsOn = normalized.startsOn ?? current.startsOn;
       const endsOn =
@@ -81,8 +99,9 @@ export async function updateUserTemplate(
 export async function archiveUserTemplate(
   userId: string,
   id: string,
+  db: Database = getDb(),
 ): Promise<TaskTemplate> {
-  const template = await archiveTemplate(getDb(), userId, id);
+  const template = await archiveTemplate(db, userId, id);
   if (!template) throw new GameError("template_not_found", "Template not found");
   return template;
 }

@@ -14,6 +14,7 @@ export type GameErrorCode =
   | "duplicate_skill"
   | "duplicate_template"
   | "skill_not_found"
+  | "skill_archived"
   | "attribute_not_found"
   | "invalid_input";
 
@@ -45,6 +46,7 @@ export class GameError extends Error {
       case "quest_step_task_exists":
       case "duplicate_skill":
       case "duplicate_template":
+      case "skill_archived":
         return 409;
       default:
         return 400;
