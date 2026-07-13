@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  check,
   integer,
   jsonb,
   numeric,
@@ -45,6 +46,17 @@ export const xpTransactions = pgTable(
       .defaultNow(),
   },
   (table) => [
+    check("xp_transactions_amount_check", sql`${table.amount} <> 0`),
+    check(
+      "xp_transactions_scope_check",
+      sql`${table.scope} in ('global', 'skill', 'attribute')`,
+    ),
+    check(
+      "xp_transactions_source_type_check",
+      sql`${table.sourceType} in ('task_completion', 'quest_completion', 'achievement', 'manual_adjustment', 'reversal')`,
+    ),
+    check("xp_transactions_base_xp_check", sql`${table.baseXp} >= 0`),
+    check("xp_transactions_multiplier_check", sql`${table.multiplier} > 0`),
     // Idempotent accrual per source, except reversals and manual adjustments.
     uniqueIndex("xp_transactions_accrual_unique")
       .on(table.userId, table.scope, table.sourceType, table.sourceId)

@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import {
+  check,
   date,
   integer,
   pgTable,
@@ -28,7 +30,13 @@ export const streaks = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [unique("streaks_user_template_unique").on(table.userId, table.templateId)],
+  (table) => [
+    unique("streaks_user_template_unique").on(table.userId, table.templateId),
+    check(
+      "streaks_counts_check",
+      sql`${table.currentCount} >= 0 and ${table.bestCount} >= ${table.currentCount}`,
+    ),
+  ],
 );
 
 export type Streak = typeof streaks.$inferSelect;

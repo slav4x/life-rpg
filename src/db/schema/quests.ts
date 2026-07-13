@@ -1,5 +1,7 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   date,
   integer,
   pgTable,
@@ -34,7 +36,14 @@ export const quests = pgTable("quests", {
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}, (table) => [
+  check("quests_type_check", sql`${table.type} in ('main', 'side', 'long_term')`),
+  check(
+    "quests_status_check",
+    sql`${table.status} in ('draft', 'active', 'completed', 'archived')`,
+  ),
+  check("quests_reward_xp_check", sql`${table.rewardXp} between 0 and 10000`),
+]);
 
 export type Quest = typeof quests.$inferSelect;
 export type NewQuest = typeof quests.$inferInsert;

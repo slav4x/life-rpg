@@ -42,6 +42,20 @@ function duplicateIds(rows: { id: string }[], label: string): string[] {
   return conflicts;
 }
 
+function duplicateNames(
+  rows: { name: string }[],
+  label: string,
+): string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const row of rows) {
+    const name = normalize(row.name);
+    if (seen.has(name)) duplicates.add(row.name.trim());
+    seen.add(name);
+  }
+  return [...duplicates].map((name) => `${label} «${name}»: название повторяется`);
+}
+
 async function hasUserData(db: DbClient, userId: string): Promise<boolean> {
   const [skills, tasks, quests, transactions] = await Promise.all([
     db.select({ id: schema.skills.id }).from(schema.skills).where(eq(schema.skills.userId, userId)).limit(1),
@@ -126,6 +140,16 @@ function validateBackupReferences(backup: BackupImport): string[] {
     ...duplicateIds(backup.quests, "Квесты"),
     ...duplicateIds(backup.questSteps, "Шаги квестов"),
     ...duplicateIds(backup.streaks, "Серии"),
+    ...duplicateNames(
+      backup.skills.filter((row) => row.status === "active"),
+      "Навык",
+    ),
+    ...duplicateNames(
+      backup.taskTemplates
+        .filter((row) => row.archivedAt === null)
+        .map((row) => ({ name: row.title })),
+      "Шаблон",
+    ),
   ];
   const attributeIds = new Set(backup.attributes.map((row) => row.id));
   const skillIds = new Set(backup.skills.map((row) => row.id));

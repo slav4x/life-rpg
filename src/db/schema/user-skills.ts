@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import {
+  check,
   integer,
   pgTable,
   primaryKey,
@@ -24,7 +26,10 @@ export const userSkills = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.userId, table.skillId] })],
+  (table) => [
+    primaryKey({ columns: [table.userId, table.skillId] }),
+    check("user_skills_xp_check", sql`${table.xp} >= 0`),
+  ],
 );
 
 export type UserSkill = typeof userSkills.$inferSelect;

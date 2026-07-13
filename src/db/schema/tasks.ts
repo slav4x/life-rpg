@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   date,
+  check,
   integer,
   pgTable,
   text,
@@ -15,8 +16,8 @@ import { taskTemplates } from "./task-templates";
 import { users } from "./users";
 
 /**
- * A concrete action assigned to a date (SPEC §5.4, §10). May originate from a
- * recurring template; the `quest_step_id` link arrives in a later stage.
+ * A concrete action assigned to a date (SPEC §5.4, §10). It may originate from
+ * a recurring template or be linked to a quest step.
  */
 export const tasks = pgTable(
   "tasks",
@@ -49,6 +50,19 @@ export const tasks = pgTable(
       .defaultNow(),
   },
   (table) => [
+    check("tasks_base_xp_check", sql`${table.baseXp} between 5 and 250`),
+    check(
+      "tasks_difficulty_check",
+      sql`${table.difficulty} in ('easy', 'normal', 'hard', 'epic')`,
+    ),
+    check(
+      "tasks_status_check",
+      sql`${table.status} in ('pending', 'completed', 'cancelled')`,
+    ),
+    check(
+      "tasks_estimated_minutes_check",
+      sql`${table.estimatedMinutes} is null or ${table.estimatedMinutes} between 1 and 1440`,
+    ),
     // One template task per user per day (SPEC §10, §12).
     uniqueIndex("tasks_user_date_template_unique")
       .on(table.userId, table.localDate, table.templateId)

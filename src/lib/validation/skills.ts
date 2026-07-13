@@ -12,7 +12,7 @@ const attributeCode = z.enum([
 ]);
 
 export const createSkillInputSchema = z.object({
-  name: z.string().min(1).max(80),
+  name: z.string().trim().min(1).max(80),
   attributeCode,
   description: z.string().max(1000).optional(),
   icon: z.enum(SKILL_ICONS).optional(),
@@ -21,7 +21,7 @@ export const createSkillInputSchema = z.object({
 
 export const updateSkillInputSchema = z
   .object({
-    name: z.string().min(1).max(80).optional(),
+    name: z.string().trim().min(1).max(80).optional(),
     description: z.string().max(1000).nullable().optional(),
     attributeCode: attributeCode.optional(),
     icon: z.enum(SKILL_ICONS).nullable().optional(),

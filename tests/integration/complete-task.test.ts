@@ -105,14 +105,19 @@ describe.skipIf(!url)("completeTask (integration)", () => {
   });
 
   it("reports a global level-up when crossing a threshold", async () => {
-    const task = await newTask(400);
+    const firstTask = await newTask(250);
+    await completeTask(
+      { userId, taskId: firstTask.id, idempotencyKey: "before-level-up" },
+      db,
+    );
+    const task = await newTask(150);
 
     const result = await completeTask(
       { userId, taskId: task.id, idempotencyKey: "k1" },
       db,
     );
 
-    // 400 XP -> level 2.
+    // 250 + 150 XP -> level 2.
     expect(result.levelUp).toEqual({ from: 1, to: 2 });
   });
 

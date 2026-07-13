@@ -5,6 +5,7 @@ import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { ensureTasksForDate } from "@/application/tasks/ensure-daily-tasks";
+import { createUserTemplate } from "@/application/templates/create-template";
 import { ensureAttributes, listAttributes } from "@/db/repositories/attributes";
 import { createSkill } from "@/db/repositories/skills";
 import {
@@ -124,5 +125,46 @@ describe.skipIf(!url)("ensureTasksForDate (integration)", () => {
       .from(tasks)
       .where(eq(tasks.userId, userId));
     expect(rows).toHaveLength(0);
+  });
+
+  it("rejects duplicate live template titles but allows reuse after archive", async () => {
+    const template = await createTemplate(db, {
+      userId,
+      skillId,
+      title: "Зарядка",
+      baseXp: 20,
+      difficulty: "normal",
+      recurrenceType: "daily",
+    });
+
+    await expect(
+      createUserTemplate(
+        {
+          userId,
+          skillId,
+          title: " зарядка ",
+          baseXp: 30,
+          difficulty: "hard",
+          recurrenceType: "daily",
+          localDate: DATE,
+        },
+        db,
+      ),
+    ).rejects.toMatchObject({ code: "duplicate_template", status: 409 });
+
+    await archiveTemplate(db, userId, template.id);
+    const replacement = await createUserTemplate(
+      {
+        userId,
+        skillId,
+        title: "ЗАРЯДКА",
+        baseXp: 30,
+        difficulty: "hard",
+        recurrenceType: "daily",
+        localDate: DATE,
+      },
+      db,
+    );
+    expect(replacement.archivedAt).toBeNull();
   });
 });

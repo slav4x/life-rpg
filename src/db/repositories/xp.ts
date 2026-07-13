@@ -259,6 +259,16 @@ export async function incrementUserSkillXp(
   skillId: string,
   delta: number,
 ): Promise<number> {
+  if (delta < 0) {
+    const [row] = await db
+      .update(userSkills)
+      .set({ xp: sql`${userSkills.xp} + ${delta}`, updatedAt: new Date() })
+      .where(and(eq(userSkills.userId, userId), eq(userSkills.skillId, skillId)))
+      .returning({ xp: userSkills.xp });
+    if (!row) throw new Error("Cannot subtract XP from a missing skill cache");
+    return row.xp;
+  }
+
   const [row] = await db
     .insert(userSkills)
     .values({ userId, skillId, xp: delta, updatedAt: new Date() })
@@ -308,6 +318,21 @@ export async function incrementUserAttributeXp(
   attributeId: string,
   delta: number,
 ): Promise<number> {
+  if (delta < 0) {
+    const [row] = await db
+      .update(userAttributes)
+      .set({ xp: sql`${userAttributes.xp} + ${delta}`, updatedAt: new Date() })
+      .where(
+        and(
+          eq(userAttributes.userId, userId),
+          eq(userAttributes.attributeId, attributeId),
+        ),
+      )
+      .returning({ xp: userAttributes.xp });
+    if (!row) throw new Error("Cannot subtract XP from a missing attribute cache");
+    return row.xp;
+  }
+
   const [row] = await db
     .insert(userAttributes)
     .values({ userId, attributeId, xp: delta, updatedAt: new Date() })

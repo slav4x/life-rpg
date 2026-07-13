@@ -5,9 +5,8 @@ import { z } from "zod";
  *
  * This module is server-only — never import it from client components.
  *
- * Stage 0 keeps database and Telegram secrets optional so the project builds
- * and boots without them. Later stages tighten these into required values as
- * the corresponding features land.
+ * Runtime secrets stay optional in the base schema so production images can
+ * build without secrets; `superRefine` requires them at production runtime.
  */
 export const envSchema = z.object({
   NODE_ENV: z
@@ -15,13 +14,13 @@ export const envSchema = z.object({
     .default("development"),
   APP_URL: z.url().optional(),
 
-  // Database (Stage 1+)
+  // Database
   DATABASE_URL: z.string().min(1).optional(),
   POSTGRES_DB: z.string().min(1).optional(),
   POSTGRES_USER: z.string().min(1).optional(),
   POSTGRES_PASSWORD: z.string().min(1).optional(),
 
-  // Telegram auth (Stage 1+)
+  // Telegram auth
   TELEGRAM_BOT_TOKEN: z.string().min(1).optional(),
   ALLOWED_TELEGRAM_USER_IDS: z.string().optional(),
   TELEGRAM_AUTH_MAX_AGE_SECONDS: z.coerce

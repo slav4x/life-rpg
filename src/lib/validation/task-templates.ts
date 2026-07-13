@@ -7,7 +7,7 @@ const weekdays = z.array(z.number().int().min(1).max(7)).min(1).max(7);
 
 export const createTemplateInputSchema = z
   .object({
-    title: z.string().min(1).max(200),
+    title: z.string().trim().min(1).max(200),
     description: z.string().max(2000).optional(),
     skillId: z.uuid(),
     baseXp: baseXpSchema,
@@ -23,7 +23,7 @@ export const createTemplateInputSchema = z
 
 export const updateTemplateInputSchema = z
   .object({
-    title: z.string().min(1).max(200).optional(),
+    title: z.string().trim().min(1).max(200).optional(),
     description: z.string().max(2000).nullable().optional(),
     skillId: z.uuid().optional(),
     baseXp: baseXpSchema.optional(),

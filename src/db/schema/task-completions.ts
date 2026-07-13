@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   date,
+  check,
   integer,
   pgTable,
   text,
@@ -36,6 +37,7 @@ export const taskCompletions = pgTable(
       .defaultNow(),
   },
   (table) => [
+    check("task_completions_final_xp_check", sql`${table.finalXp} > 0`),
     // At most one ACTIVE completion per task; reverted rows are kept as history
     // and must not block re-completing the task (SPEC §11).
     uniqueIndex("task_completions_active_task_unique")

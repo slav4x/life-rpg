@@ -51,7 +51,7 @@ export interface CompleteTaskCommand {
  * Complete a task in a single transaction (SPEC §11): lock the row, verify
  * ownership and idempotency, compute XP server-side, write the completion and
  * three XP-journal entries (global / skill / attribute), and refresh the
- * cached skill and attribute totals. Streaks and achievements arrive later.
+ * cached skill and attribute totals, streaks and achievements.
  */
 export async function completeTask(
   cmd: CompleteTaskCommand,

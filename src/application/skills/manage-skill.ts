@@ -1,5 +1,6 @@
 import { GameError } from "@/application/game/errors";
 import { getDb, type DbClient } from "@/db/client";
+import { isUniqueConstraintViolation } from "@/db/errors";
 import { listAttributes } from "@/db/repositories/attributes";
 import {
   archiveSkill,
@@ -55,7 +56,15 @@ export async function updateUserSkill(
     }
   }
 
-  const skill = await updateSkill(db, userId, id, fields);
+  let skill: Skill | undefined;
+  try {
+    skill = await updateSkill(db, userId, id, fields);
+  } catch (error) {
+    if (isUniqueConstraintViolation(error, "skills_user_active_name_unique")) {
+      throw new GameError("duplicate_skill", "Active skill name already exists");
+    }
+    throw error;
+  }
   if (!skill) throw new GameError("skill_not_found", "Skill not found");
   return skill;
 }

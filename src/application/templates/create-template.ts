@@ -1,6 +1,7 @@
 import { GameError } from "@/application/game/errors";
 import { ensureTasksForDate } from "@/application/tasks/ensure-daily-tasks";
-import { getDb } from "@/db/client";
+import { getDb, type Database } from "@/db/client";
+import { isUniqueConstraintViolation } from "@/db/errors";
 import { getSkillById } from "@/db/repositories/skills";
 import { createTemplate } from "@/db/repositories/task-templates";
 import type { TaskTemplate } from "@/db/schema";
@@ -23,6 +24,7 @@ export interface CreateTemplateCommand {
 /** Create a recurring template and materialise today's task (SPEC §6.3). */
 export async function createUserTemplate(
   cmd: CreateTemplateCommand,
+  db: Database = getDb(),
 ): Promise<TaskTemplate> {
   if (!isDifficulty(cmd.difficulty)) {
     throw new GameError("invalid_input", "Unknown difficulty");
@@ -37,22 +39,37 @@ export async function createUserTemplate(
     throw new GameError("invalid_input", "Select at least one weekday");
   }
 
-  const db = getDb();
   const skill = await getSkillById(db, cmd.userId, cmd.skillId);
   if (!skill || skill.status !== "active") {
     throw new GameError("skill_not_found", "Skill not found");
   }
 
-  const template = await createTemplate(db, {
-    userId: cmd.userId,
-    skillId: cmd.skillId,
-    title: cmd.title,
-    description: cmd.description ?? null,
-    baseXp: cmd.baseXp,
-    difficulty: cmd.difficulty,
-    recurrenceType: cmd.recurrenceType,
-    weekdays: cmd.recurrenceType === "weekdays" ? (cmd.weekdays ?? null) : null,
-  });
+  let template: TaskTemplate;
+  try {
+    template = await createTemplate(db, {
+      userId: cmd.userId,
+      skillId: cmd.skillId,
+      title: cmd.title,
+      description: cmd.description ?? null,
+      baseXp: cmd.baseXp,
+      difficulty: cmd.difficulty,
+      recurrenceType: cmd.recurrenceType,
+      weekdays: cmd.recurrenceType === "weekdays" ? (cmd.weekdays ?? null) : null,
+    });
+  } catch (error) {
+    if (
+      isUniqueConstraintViolation(
+        error,
+        "task_templates_user_live_title_unique",
+      )
+    ) {
+      throw new GameError(
+        "duplicate_template",
+        "Non-archived template title already exists",
+      );
+    }
+    throw error;
+  }
 
   await ensureTasksForDate(cmd.userId, cmd.localDate, db);
   return template;

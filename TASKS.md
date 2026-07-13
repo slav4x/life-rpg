@@ -217,8 +217,8 @@
 ### Проверено
 
 - `npm run typecheck`, `npm run lint`, `npm run build` — без ошибок.
-- `npm run test` — 73 теста (unit + integration против PostgreSQL). E2E-спеки
-  (`tests/e2e/`) через dev-bypass; запуск: `npx playwright install && npm run test:e2e`.
+- `npm run test` — 104 теста (unit + integration против PostgreSQL), включая
+  DB-level ограничения и политику дублей. Playwright: 9 E2E-сценариев через dev-bypass.
 - Security headers на живом сервере: `X-Content-Type-Options`, `Referrer-Policy`,
   `X-DNS-Prefetch-Control`, `Permissions-Policy` (без `X-Frame-Options` — для Telegram);
   HSTS добавляется в production.
@@ -237,6 +237,8 @@
   копия — off-site (по SPEC §17). Скрипты используют `docker compose exec`.
 - Реальный запуск через BotFather и завершение этапа 6 подтверждены владельцем проекта.
 - Post-MVP несостыковки и будущие доработки вынесены в [`BACKLOG.md`](./BACKLOG.md).
+- Статусы, типы, сложность и XP защищены `CHECK`; активные навыки и неархивные
+  шаблоны уникальны по нормализованному названию в пределах пользователя.
 
 ---
 

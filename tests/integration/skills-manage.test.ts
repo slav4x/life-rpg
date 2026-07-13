@@ -8,6 +8,7 @@ import {
   archiveUserSkill,
   updateUserSkill,
 } from "@/application/skills/manage-skill";
+import { createUserSkill } from "@/application/skills/create-skill";
 import { completeTask } from "@/application/tasks/complete-task";
 import { revertTask } from "@/application/tasks/revert-task";
 import { ensureAttributes, listAttributes } from "@/db/repositories/attributes";
@@ -120,5 +121,25 @@ describe.skipIf(!url)("skill management (integration)", () => {
       .where(eq(taskTemplates.id, template.id));
     expect(t.isActive).toBe(false);
     expect(t.archivedAt).not.toBeNull();
+  });
+
+  it("rejects a duplicate active skill name but allows reuse after archive", async () => {
+    await expect(
+      createUserSkill(
+        {
+          userId,
+          name: " frontend ",
+          attributeCode: "mind",
+        },
+        db,
+      ),
+    ).rejects.toMatchObject({ code: "duplicate_skill", status: 409 });
+
+    await archiveUserSkill(userId, skillId, db);
+    const replacement = await createUserSkill(
+      { userId, name: "FRONTEND", attributeCode: "mind" },
+      db,
+    );
+    expect(replacement.status).toBe("active");
   });
 });
