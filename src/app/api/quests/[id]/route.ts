@@ -24,8 +24,8 @@ export async function GET(
   }
 
   try {
-    const { quest, steps } = await getUserQuest(user.id, id);
-    return NextResponse.json({ quest, steps });
+    const { quest, steps, taskLinks } = await getUserQuest(user.id, id);
+    return NextResponse.json({ quest, steps, taskLinks });
   } catch (error) {
     if (error instanceof GameError) {
       return NextResponse.json({ error: error.code }, { status: error.status });
@@ -62,8 +62,11 @@ export async function PATCH(
   }
 
   try {
-    const quest = await updateUserQuest(user.id, id, parsed.data);
-    return NextResponse.json({ quest: { id: quest.id } });
+    const result = await updateUserQuest(user.id, id, parsed.data);
+    return NextResponse.json({
+      quest: { id: result.quest.id, status: result.quest.status },
+      questCompleted: result.questCompleted,
+    });
   } catch (error) {
     if (error instanceof GameError) {
       return NextResponse.json({ error: error.code }, { status: error.status });

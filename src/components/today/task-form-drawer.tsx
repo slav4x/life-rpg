@@ -50,6 +50,13 @@ export interface TaskEditVM {
   templateId: string | null;
 }
 
+export interface TaskPreset {
+  title: string;
+  description?: string | null;
+  questStepId: string;
+  skillId?: string;
+}
+
 const WEEKDAYS = [
   { iso: 1, label: "Пн" },
   { iso: 2, label: "Вт" },
@@ -64,11 +71,13 @@ export function TaskFormDrawer({
   date,
   skills,
   task,
+  preset,
   trigger,
 }: {
   date: string;
   skills: SkillOption[];
   task?: TaskEditVM;
+  preset?: TaskPreset;
   trigger?: ReactNode;
 }) {
   const router = useRouter();
@@ -76,15 +85,19 @@ export function TaskFormDrawer({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const [title, setTitle] = useState(task?.title ?? "");
-  const [skillId, setSkillId] = useState(task?.skillId ?? skills[0]?.id ?? "");
+  const [title, setTitle] = useState(task?.title ?? preset?.title ?? "");
+  const [skillId, setSkillId] = useState(
+    task?.skillId ?? preset?.skillId ?? skills[0]?.id ?? "",
+  );
   const [difficulty, setDifficulty] = useState(task?.difficulty ?? "normal");
   const [baseXp, setBaseXp] = useState(String(task?.baseXp ?? BASE_XP.default));
   const [minutes, setMinutes] = useState(
     task?.estimatedMinutes ? String(task.estimatedMinutes) : "",
   );
   const [localDate, setLocalDate] = useState(task?.localDate ?? date);
-  const [description, setDescription] = useState(task?.description ?? "");
+  const [description, setDescription] = useState(
+    task?.description ?? preset?.description ?? "",
+  );
   const [recurrence, setRecurrence] = useState<Recurrence>("none");
   const [weekdays, setWeekdays] = useState<number[]>([]);
   const [scope, setScope] = useState<"this" | "future">("this");
@@ -131,7 +144,7 @@ export function TaskFormDrawer({
             scope: task!.templateId ? scope : undefined,
           }),
         });
-      } else if (recurrence !== "none") {
+      } else if (!preset && recurrence !== "none") {
         if (recurrence === "weekdays" && weekdays.length === 0) {
           toast.error("Выберите дни недели");
           setBusy(false);
@@ -163,6 +176,7 @@ export function TaskFormDrawer({
             localDate,
             description: description.trim() || undefined,
             estimatedMinutes: estimatedMinutes ?? undefined,
+            questStepId: preset?.questStepId,
           }),
         });
       }
@@ -301,7 +315,7 @@ export function TaskFormDrawer({
               />
             </div>
 
-            {!isEdit && (
+            {!isEdit && !preset && (
               <div className="flex flex-col gap-1.5">
                 <Label>Повторение</Label>
                 <Select
@@ -320,7 +334,7 @@ export function TaskFormDrawer({
               </div>
             )}
 
-            {!isEdit && recurrence === "weekdays" && (
+            {!isEdit && !preset && recurrence === "weekdays" && (
               <div className="flex flex-wrap gap-1.5">
                 {WEEKDAYS.map((d) => (
                   <button

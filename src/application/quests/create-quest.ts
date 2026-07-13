@@ -1,5 +1,6 @@
 import { GameError } from "@/application/game/errors";
-import { getDb } from "@/db/client";
+import { getDb, type Database } from "@/db/client";
+import { listAttributes } from "@/db/repositories/attributes";
 import { createSteps } from "@/db/repositories/quest-steps";
 import { createQuest } from "@/db/repositories/quests";
 import type { Quest } from "@/db/schema";
@@ -14,15 +15,25 @@ export interface CreateQuestCommand {
   rewardXp: number;
   dueDate?: string | null;
   manualCompletion?: boolean;
-  steps: { title: string; isRequired?: boolean }[];
+  steps: { title: string; description?: string; isRequired?: boolean }[];
 }
 
-export async function createUserQuest(cmd: CreateQuestCommand): Promise<Quest> {
+export async function createUserQuest(
+  cmd: CreateQuestCommand,
+  db: Database = getDb(),
+): Promise<Quest> {
   if (!isQuestType(cmd.type)) {
     throw new GameError("invalid_input", "Unknown quest type");
   }
 
-  return getDb().transaction(async (tx) => {
+  return db.transaction(async (tx) => {
+    if (
+      cmd.attributeId &&
+      !(await listAttributes(tx)).some((attribute) => attribute.id === cmd.attributeId)
+    ) {
+      throw new GameError("attribute_not_found", "Attribute not found");
+    }
+
     const quest = await createQuest(tx, {
       userId: cmd.userId,
       title: cmd.title,
@@ -40,6 +51,7 @@ export async function createUserQuest(cmd: CreateQuestCommand): Promise<Quest> {
       quest.id,
       cmd.steps.map((s, index) => ({
         title: s.title,
+        description: s.description ?? null,
         isRequired: s.isRequired ?? true,
         sortOrder: index,
       })),

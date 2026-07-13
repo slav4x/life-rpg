@@ -6,6 +6,8 @@ import {
 } from "@/application/game/check-achievements";
 import { GameError } from "@/application/game/errors";
 import { recomputeStreak } from "@/application/game/recompute-streak";
+import { completeLinkedQuestStep } from "@/application/quests/complete-linked-step";
+import type { QuestCompletionOutcome } from "@/application/quests/award-completion";
 import { getDb, type Database, type Transaction } from "@/db/client";
 import {
   createCompletion,
@@ -36,6 +38,7 @@ export interface CompleteTaskResult {
   attribute: { id: string; code: string; name: string; xp: number };
   streak: { current: number; best: number } | null;
   unlockedAchievements: UnlockedAchievement[];
+  questCompleted: QuestCompletionOutcome | null;
 }
 
 export interface CompleteTaskCommand {
@@ -155,6 +158,9 @@ export async function completeTask(
       cmd.userId,
       completion.id,
     );
+    const questCompleted = task.questStepId
+      ? await completeLinkedQuestStep(tx, cmd.userId, task.questStepId)
+      : null;
 
     return {
       completionId: completion.id,
@@ -176,6 +182,7 @@ export async function completeTask(
       },
       streak,
       unlockedAchievements,
+      questCompleted,
     } satisfies CompleteTaskResult;
   });
 }
@@ -224,5 +231,6 @@ async function buildIdempotentResult(
       ? { current: streakRow.currentCount, best: streakRow.bestCount }
       : null,
     unlockedAchievements: [],
+    questCompleted: null,
   };
 }

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "tasks_active_quest_step_unique" ON "tasks" USING btree ("quest_step_id") WHERE "tasks"."quest_step_id" is not null and "tasks"."status" <> 'cancelled';

@@ -6,7 +6,11 @@ export interface QuestVM {
   rewardXp: number;
   total: number;
   completed: number;
+  requiredTotal: number;
+  requiredCompleted: number;
   percent: number;
+  attributeName: string | null;
+  dueDate: string | null;
 }
 
 export interface StepVM {
@@ -15,6 +19,11 @@ export interface StepVM {
   description: string | null;
   isRequired: boolean;
   completed: boolean;
+  task: {
+    id: string;
+    status: string;
+    localDate: string;
+  } | null;
 }
 
 export interface QuestDetailVM {
@@ -24,4 +33,13 @@ export interface QuestDetailVM {
   type: string;
   status: string;
   rewardXp: number;
+  attributeId: string | null;
+  attributeName: string | null;
+  dueDate: string | null;
+  manualCompletion: boolean;
+}
+
+export interface QuestAttributeOption {
+  id: string;
+  name: string;
 }

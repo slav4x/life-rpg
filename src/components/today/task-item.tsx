@@ -69,6 +69,10 @@ export function TaskItem({
         ),
       });
       showAchievementToasts(result.unlockedAchievements);
+      if (result.questCompleted) {
+        toast.success(`Квест завершён! +${result.questCompleted.rewardXp} XP`);
+        showAchievementToasts(result.questCompleted.unlockedAchievements);
+      }
       router.refresh();
     } catch {
       toast.error("Ошибка сети");
@@ -123,6 +127,7 @@ export function TaskItem({
               <span>~{task.estimatedMinutes} мин</span>
             </>
           )}
+          {task.questStepId && <Badge variant="outline">Шаг квеста</Badge>}
           {task.streak != null && task.streak > 0 && (
             <span className="inline-flex items-center gap-0.5 text-foreground">
               <Flame className="size-3" />

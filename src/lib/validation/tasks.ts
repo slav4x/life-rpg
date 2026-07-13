@@ -12,6 +12,7 @@ export const createTaskInputSchema = z.object({
   baseXp: baseXpSchema,
   difficulty,
   estimatedMinutes: estimatedMinutesSchema.optional(),
+  questStepId: z.uuid().optional(),
 });
 
 export const updateTaskInputSchema = z

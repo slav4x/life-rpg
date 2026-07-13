@@ -1,7 +1,13 @@
 import { and, asc, desc, eq, ne } from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
-import { skills, tasks, type Skill, type Task } from "@/db/schema";
+import {
+  questSteps,
+  skills,
+  tasks,
+  type Skill,
+  type Task,
+} from "@/db/schema";
 
 export interface CreateTaskInput {
   userId: string;
@@ -12,6 +18,7 @@ export interface CreateTaskInput {
   baseXp: number;
   difficulty: string;
   estimatedMinutes?: number | null;
+  questStepId?: string | null;
 }
 
 export async function createTask(
@@ -29,6 +36,7 @@ export async function createTask(
       baseXp: input.baseXp,
       difficulty: input.difficulty,
       estimatedMinutes: input.estimatedMinutes ?? null,
+      questStepId: input.questStepId ?? null,
     })
     .returning();
   return task;
@@ -122,6 +130,60 @@ export async function getTaskById(
     .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
     .limit(1);
   return task;
+}
+
+export async function getActiveTaskByQuestStepId(
+  db: DbClient,
+  userId: string,
+  questStepId: string,
+): Promise<Task | undefined> {
+  const [task] = await db
+    .select()
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.userId, userId),
+        eq(tasks.questStepId, questStepId),
+        ne(tasks.status, "cancelled"),
+      ),
+    )
+    .limit(1);
+  return task;
+}
+
+export interface QuestStepTaskLink {
+  stepId: string;
+  taskId: string;
+  status: string;
+  localDate: string;
+}
+
+export async function listTaskLinksForQuest(
+  db: DbClient,
+  userId: string,
+  questId: string,
+): Promise<QuestStepTaskLink[]> {
+  return db
+    .select({
+      stepId: tasks.questStepId,
+      taskId: tasks.id,
+      status: tasks.status,
+      localDate: tasks.localDate,
+    })
+    .from(tasks)
+    .innerJoin(questSteps, eq(questSteps.id, tasks.questStepId))
+    .where(
+      and(
+        eq(tasks.userId, userId),
+        eq(questSteps.questId, questId),
+        ne(tasks.status, "cancelled"),
+      ),
+    )
+    .then((rows) =>
+      rows.flatMap((row) =>
+        row.stepId ? [{ ...row, stepId: row.stepId }] : [],
+      ),
+    );
 }
 
 export interface UpdateTaskFields {

@@ -6,7 +6,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { completeTask } from "@/application/tasks/complete-task";
 import { completeQuest } from "@/application/quests/complete-quest";
+import { updateUserQuest } from "@/application/quests/manage-quests";
 import { toggleStep } from "@/application/quests/toggle-step";
+import { createOneOffTask } from "@/application/tasks/create-task";
 import { ensureAttributes, listAttributes } from "@/db/repositories/attributes";
 import { listUserAchievements } from "@/db/repositories/achievements";
 import { createSteps, listSteps } from "@/db/repositories/quest-steps";
@@ -141,6 +143,136 @@ describe.skipIf(!url)("quests & achievements (integration)", () => {
     expect(result.questCompleted?.rewardXp).toBe(100);
     const [row] = await db.select().from(quests).where(eq(quests.id, quest.id));
     expect(row.status).toBe("completed");
+  });
+
+  it("updates quest fields and synchronizes step content and order", async () => {
+    const quest = await activeQuest(200);
+    const [first, second] = await listSteps(db, quest.id);
+    await toggleStep({ userId, stepId: first.id }, db);
+
+    await updateUserQuest(
+      userId,
+      quest.id,
+      {
+        title: "Обновлённый проект",
+        dueDate: "2026-08-01",
+        steps: [
+          {
+            id: second.id,
+            title: "Шаг 2 — сначала",
+            description: "Подробности",
+            isRequired: true,
+          },
+          {
+            id: first.id,
+            title: "Шаг 1 — потом",
+            isRequired: true,
+          },
+          { title: "Новый шаг", isRequired: false },
+        ],
+      },
+      db,
+    );
+
+    const rows = await listSteps(db, quest.id);
+    expect(rows.map((step) => step.title)).toEqual([
+      "Шаг 2 — сначала",
+      "Шаг 1 — потом",
+      "Новый шаг",
+    ]);
+    expect(rows[0].description).toBe("Подробности");
+    expect(rows[1].completedAt).not.toBeNull();
+
+    const [updated] = await db.select().from(quests).where(eq(quests.id, quest.id));
+    expect(updated.title).toBe("Обновлённый проект");
+    expect(updated.dueDate).toBe("2026-08-01");
+  });
+
+  it("archives and restores an active quest but keeps archived quests immutable", async () => {
+    const quest = await activeQuest(100);
+
+    await updateUserQuest(userId, quest.id, { status: "archived" }, db);
+    await expect(
+      updateUserQuest(userId, quest.id, { title: "Нельзя" }, db),
+    ).rejects.toMatchObject({ code: "quest_not_active" });
+
+    const restored = await updateUserQuest(
+      userId,
+      quest.id,
+      { status: "active" },
+      db,
+    );
+    expect(restored.quest.status).toBe("active");
+  });
+
+  it("auto-completes when editing a fully-done manual quest to automatic", async () => {
+    const quest = await activeQuest(120);
+    await completeAllSteps(quest.id);
+
+    const result = await updateUserQuest(
+      userId,
+      quest.id,
+      { manualCompletion: false },
+      db,
+    );
+
+    expect(result.quest.status).toBe("completed");
+    expect(result.questCompleted?.rewardXp).toBe(120);
+    expect(await sumGlobalXp(db, userId)).toBe(120);
+  });
+
+  it("links a task to a step and auto-completes the quest with the task", async () => {
+    const quest = await createQuest(db, {
+      userId,
+      title: "Связанный квест",
+      type: "main",
+      rewardXp: 150,
+      status: "active",
+      manualCompletion: false,
+    });
+    await createSteps(db, quest.id, [{ title: "Сделать задачу", sortOrder: 0 }]);
+    const [step] = await listSteps(db, quest.id);
+
+    const task = await createOneOffTask(
+      {
+        userId,
+        skillId,
+        questStepId: step.id,
+        title: step.title,
+        localDate: "2026-07-13",
+        baseXp: 25,
+        difficulty: "normal",
+      },
+      db,
+    );
+    await expect(
+      createOneOffTask(
+        {
+          userId,
+          skillId,
+          questStepId: step.id,
+          title: "Дубль",
+          localDate: "2026-07-13",
+          baseXp: 25,
+          difficulty: "normal",
+        },
+        db,
+      ),
+    ).rejects.toMatchObject({ code: "quest_step_task_exists" });
+
+    const result = await completeTask(
+      { userId, taskId: task.id, idempotencyKey: "linked-step" },
+      db,
+    );
+
+    expect(result.questCompleted?.rewardXp).toBe(150);
+    expect((await listSteps(db, quest.id))[0].completedAt).not.toBeNull();
+    const [completedQuest] = await db
+      .select()
+      .from(quests)
+      .where(eq(quests.id, quest.id));
+    expect(completedQuest.status).toBe("completed");
+    expect(await sumGlobalXp(db, userId)).toBe(175);
   });
 
   it("unlocks first_action only once across task completions", async () => {

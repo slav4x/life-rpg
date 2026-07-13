@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
 import { questSteps, quests, type QuestStep } from "@/db/schema";
@@ -7,6 +7,8 @@ export interface StepCounts {
   questId: string;
   total: number;
   completed: number;
+  requiredTotal: number;
+  requiredCompleted: number;
 }
 
 /** Total and completed step counts per quest, for list progress. */
@@ -19,6 +21,8 @@ export async function stepCountsByQuest(
       questId: questSteps.questId,
       total: sql<string>`count(*)`,
       completed: sql<string>`count(*) filter (where ${questSteps.completedAt} is not null)`,
+      requiredTotal: sql<string>`count(*) filter (where ${questSteps.isRequired})`,
+      requiredCompleted: sql<string>`count(*) filter (where ${questSteps.isRequired} and ${questSteps.completedAt} is not null)`,
     })
     .from(questSteps)
     .innerJoin(quests, eq(quests.id, questSteps.questId))
@@ -28,6 +32,8 @@ export async function stepCountsByQuest(
     questId: r.questId,
     total: Number(r.total),
     completed: Number(r.completed),
+    requiredTotal: Number(r.requiredTotal),
+    requiredCompleted: Number(r.requiredCompleted),
   }));
 }
 
@@ -90,4 +96,52 @@ export async function setStepCompleted(
     .update(questSteps)
     .set({ completedAt, updatedAt: new Date() })
     .where(eq(questSteps.id, stepId));
+}
+
+export interface SyncStepInput {
+  id?: string;
+  title: string;
+  description?: string | null;
+  isRequired: boolean;
+}
+
+/** Replace the editable shape/order of a quest's steps, preserving completion state. */
+export async function syncSteps(
+  db: DbClient,
+  questId: string,
+  steps: SyncStepInput[],
+): Promise<void> {
+  const existing = await listSteps(db, questId);
+  const existingIds = new Set(existing.map((step) => step.id));
+  const suppliedIds = steps.flatMap((step) => (step.id ? [step.id] : []));
+
+  if (suppliedIds.some((id) => !existingIds.has(id))) {
+    throw new Error("quest_step_mismatch");
+  }
+
+  const removedIds = existing
+    .filter((step) => !suppliedIds.includes(step.id))
+    .map((step) => step.id);
+  if (removedIds.length > 0) {
+    await db.delete(questSteps).where(inArray(questSteps.id, removedIds));
+  }
+
+  for (const [sortOrder, step] of steps.entries()) {
+    const values = {
+      title: step.title,
+      description: step.description ?? null,
+      isRequired: step.isRequired,
+      sortOrder,
+      updatedAt: new Date(),
+    };
+
+    if (step.id) {
+      await db
+        .update(questSteps)
+        .set(values)
+        .where(and(eq(questSteps.id, step.id), eq(questSteps.questId, questId)));
+    } else {
+      await db.insert(questSteps).values({ questId, ...values });
+    }
+  }
 }

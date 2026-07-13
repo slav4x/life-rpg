@@ -20,7 +20,7 @@ describe("computeQuestProgress", () => {
     ]);
     expect(p.total).toBe(3);
     expect(p.completed).toBe(1);
-    expect(p.percent).toBe(33);
+    expect(p.percent).toBe(50);
     expect(p.allRequiredDone).toBe(false);
   });
 
@@ -30,6 +30,7 @@ describe("computeQuestProgress", () => {
       { isRequired: false, completedAt: null },
     ]);
     expect(p.allRequiredDone).toBe(true);
+    expect(p.percent).toBe(100);
   });
 });
 

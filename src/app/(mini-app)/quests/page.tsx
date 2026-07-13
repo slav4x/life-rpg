@@ -1,5 +1,8 @@
 import { getAuthenticatedUser } from "@/application/auth/session";
-import { listUserQuestsWithProgress } from "@/application/quests/manage-quests";
+import {
+  listQuestAttributes,
+  listUserQuestsWithProgress,
+} from "@/application/quests/manage-quests";
 import { QuestsScreen } from "@/components/quests/quests-screen";
 import type { QuestVM } from "@/components/quests/types";
 
@@ -13,8 +16,12 @@ export default async function QuestsPage() {
     );
   }
 
-  const items = await listUserQuestsWithProgress(user.id);
-  const quests: QuestVM[] = items.map(({ quest, total, completed }) => ({
+  const [items, attributes] = await Promise.all([
+    listUserQuestsWithProgress(user.id),
+    listQuestAttributes(),
+  ]);
+  const quests: QuestVM[] = items.map(
+    ({ quest, total, completed, requiredTotal, requiredCompleted, attribute }) => ({
     id: quest.id,
     title: quest.title,
     type: quest.type,
@@ -22,8 +29,26 @@ export default async function QuestsPage() {
     rewardXp: quest.rewardXp,
     total,
     completed,
-    percent: total === 0 ? 0 : Math.round((completed / total) * 100),
-  }));
+    requiredTotal,
+    requiredCompleted,
+    percent:
+      requiredTotal === 0
+        ? total === 0
+          ? 0
+          : Math.round((completed / total) * 100)
+        : Math.round((requiredCompleted / requiredTotal) * 100),
+    attributeName: attribute?.name ?? null,
+    dueDate: quest.dueDate,
+  }),
+  );
 
-  return <QuestsScreen quests={quests} />;
+  return (
+    <QuestsScreen
+      quests={quests}
+      attributes={attributes.map((attribute) => ({
+        id: attribute.id,
+        name: attribute.name,
+      }))}
+    />
+  );
 }

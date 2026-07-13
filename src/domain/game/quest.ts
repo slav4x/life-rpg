@@ -30,13 +30,18 @@ export function computeQuestProgress(
   const requiredCompleted = required.filter(
     (s) => s.completedAt !== null,
   ).length;
+  const progressTotal = required.length > 0 ? required.length : total;
+  const progressCompleted = required.length > 0 ? requiredCompleted : completed;
 
   return {
     total,
     completed,
     requiredTotal: required.length,
     requiredCompleted,
-    percent: total === 0 ? 0 : Math.round((completed / total) * 100),
+    percent:
+      progressTotal === 0
+        ? 0
+        : Math.round((progressCompleted / progressTotal) * 100),
     allRequiredDone: requiredCompleted === required.length,
   };
 }

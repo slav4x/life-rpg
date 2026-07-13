@@ -15,8 +15,15 @@ export type Transaction = Parameters<
 /** Accepted by repositories so they work both standalone and inside a tx. */
 export type DbClient = Database | Transaction;
 
-let sql: ReturnType<typeof postgres> | undefined;
-let database: Database | undefined;
+type SqlClient = ReturnType<typeof postgres>;
+
+const globalForDb = globalThis as typeof globalThis & {
+  lifeRpgSql?: SqlClient;
+  lifeRpgDatabase?: Database;
+};
+
+let sql = globalForDb.lifeRpgSql;
+let database = globalForDb.lifeRpgDatabase;
 
 /**
  * Lazily-initialised Drizzle client. Kept lazy so `next build` and unit tests
@@ -29,6 +36,8 @@ export function getDb(): Database {
     }
     sql = postgres(env.DATABASE_URL, { max: 10 });
     database = drizzle(sql, { schema });
+    globalForDb.lifeRpgSql = sql;
+    globalForDb.lifeRpgDatabase = database;
   }
   return database;
 }
@@ -39,5 +48,7 @@ export async function closeDb(): Promise<void> {
     await sql.end({ timeout: 5 });
     sql = undefined;
     database = undefined;
+    globalForDb.lifeRpgSql = undefined;
+    globalForDb.lifeRpgDatabase = undefined;
   }
 }

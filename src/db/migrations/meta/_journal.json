@@ -50,6 +50,13 @@
       "when": 1783917312863,
       "tag": "0006_seed_achievements",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1783939109733,
+      "tag": "0007_careful_tombstone",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,7 @@ export interface TaskVM {
   finalXp: number;
   estimatedMinutes: number | null;
   templateId: string | null;
+  questStepId: string | null;
   /** Current streak for template tasks; null for one-off tasks. */
   streak: number | null;
 }
@@ -19,4 +20,5 @@ export interface TaskVM {
 export interface SkillOption {
   id: string;
   name: string;
+  attributeId: string;
 }

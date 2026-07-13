@@ -53,6 +53,11 @@ export const tasks = pgTable(
     uniqueIndex("tasks_user_date_template_unique")
       .on(table.userId, table.localDate, table.templateId)
       .where(sql`${table.templateId} is not null`),
+    uniqueIndex("tasks_active_quest_step_unique")
+      .on(table.questStepId)
+      .where(
+        sql`${table.questStepId} is not null and ${table.status} <> 'cancelled'`,
+      ),
   ],
 );
 

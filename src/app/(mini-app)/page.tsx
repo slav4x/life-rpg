@@ -60,6 +60,7 @@ export default async function TodayPage({
       finalXp: calculateFinalXp(task.baseXp, difficulty),
       estimatedMinutes: task.estimatedMinutes,
       templateId: task.templateId,
+      questStepId: task.questStepId,
       streak: task.templateId
         ? (data.streaksByTemplate[task.templateId] ?? 0)
         : null,
@@ -77,7 +78,11 @@ export default async function TodayPage({
       completedCount={data.completedCount}
       totalCount={data.totalCount}
       tasks={tasks}
-      skills={data.skills.map((s) => ({ id: s.id, name: s.name }))}
+      skills={data.skills.map((s) => ({
+        id: s.id,
+        name: s.name,
+        attributeId: s.attributeId,
+      }))}
     />
   );
 }

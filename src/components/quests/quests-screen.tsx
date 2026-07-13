@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { QUEST_TYPES } from "@/domain/game/quest";
 
 import { CreateQuestDrawer } from "./create-quest-drawer";
-import type { QuestVM } from "./types";
+import type { QuestAttributeOption, QuestVM } from "./types";
 
 const typeLabel = (t: string) =>
   QUEST_TYPES.find((x) => x.value === t)?.label ?? t;
@@ -21,16 +21,30 @@ function QuestCard({ quest }: { quest: QuestVM }) {
     >
       <div className="flex items-start justify-between gap-2">
         <span className="text-sm font-medium">{quest.title}</span>
-        <Badge variant="secondary" className="shrink-0 font-normal">
-          {typeLabel(quest.type)}
-        </Badge>
+        <div className="flex shrink-0 flex-wrap justify-end gap-1">
+          {quest.attributeName && (
+            <Badge variant="outline" className="font-normal">
+              {quest.attributeName}
+            </Badge>
+          )}
+          <Badge variant="secondary" className="font-normal">
+            {typeLabel(quest.type)}
+          </Badge>
+        </div>
       </div>
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>
-          {quest.completed}/{quest.total} шагов
+          {quest.requiredTotal > 0
+            ? `${quest.requiredCompleted}/${quest.requiredTotal} обязательных`
+            : `${quest.completed}/${quest.total} шагов`}
         </span>
         {quest.rewardXp > 0 && <span>Награда: {quest.rewardXp} XP</span>}
       </div>
+      {quest.dueDate && (
+        <span className="text-xs text-muted-foreground">
+          До {new Intl.DateTimeFormat("ru-RU").format(new Date(`${quest.dueDate}T00:00:00`))}
+        </span>
+      )}
       {quest.total > 0 && <Progress value={quest.percent} />}
     </Link>
   );
@@ -53,7 +67,13 @@ function QuestList({ items, empty }: { items: QuestVM[]; empty: string }) {
   );
 }
 
-export function QuestsScreen({ quests }: { quests: QuestVM[] }) {
+export function QuestsScreen({
+  quests,
+  attributes,
+}: {
+  quests: QuestVM[];
+  attributes: QuestAttributeOption[];
+}) {
   const active = quests.filter(
     (q) => q.status === "active" || q.status === "draft",
   );
@@ -64,7 +84,7 @@ export function QuestsScreen({ quests }: { quests: QuestVM[] }) {
     <div className="flex flex-col gap-4 py-2">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold tracking-tight">Квесты</h1>
-        <CreateQuestDrawer />
+        <CreateQuestDrawer attributes={attributes} />
       </div>
 
       <Tabs defaultValue="active">

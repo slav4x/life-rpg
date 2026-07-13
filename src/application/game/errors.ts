@@ -7,6 +7,8 @@ export type GameErrorCode =
   | "quest_not_active"
   | "quest_steps_incomplete"
   | "step_not_found"
+  | "step_already_completed"
+  | "quest_step_task_exists"
   | "skill_not_found"
   | "attribute_not_found"
   | "invalid_input";
@@ -33,6 +35,8 @@ export class GameError extends Error {
       case "nothing_to_revert":
       case "quest_not_active":
       case "quest_steps_incomplete":
+      case "step_already_completed":
+      case "quest_step_task_exists":
         return 409;
       default:
         return 400;
