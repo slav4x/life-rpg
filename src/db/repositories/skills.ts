@@ -1,7 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
-import { skills, type Skill } from "@/db/schema";
+import { skills, userSkills, type Skill } from "@/db/schema";
 
 export interface CreateSkillInput {
   userId: string;
@@ -76,5 +76,64 @@ export async function getSkillById(
     .from(skills)
     .where(and(eq(skills.id, skillId), eq(skills.userId, userId)))
     .limit(1);
+  return skill;
+}
+
+export interface SkillWithXp {
+  skill: Skill;
+  xp: number;
+}
+
+/** Active skills with their cached XP (0 when not started). */
+export async function listActiveSkillsWithXp(
+  db: DbClient,
+  userId: string,
+): Promise<SkillWithXp[]> {
+  const rows = await db
+    .select({ skill: skills, xp: userSkills.xp })
+    .from(skills)
+    .leftJoin(
+      userSkills,
+      and(eq(userSkills.skillId, skills.id), eq(userSkills.userId, userId)),
+    )
+    .where(and(eq(skills.userId, userId), eq(skills.status, "active")))
+    .orderBy(asc(skills.name));
+  return rows.map((r) => ({ skill: r.skill, xp: r.xp ?? 0 }));
+}
+
+export interface UpdateSkillFields {
+  name?: string;
+  description?: string | null;
+  attributeId?: string;
+  icon?: string | null;
+  color?: string | null;
+}
+
+export async function updateSkill(
+  db: DbClient,
+  userId: string,
+  id: string,
+  fields: UpdateSkillFields,
+): Promise<Skill | undefined> {
+  const [skill] = await db
+    .update(skills)
+    .set({ ...fields, updatedAt: new Date() })
+    .where(and(eq(skills.id, id), eq(skills.userId, userId)))
+    .returning();
+  return skill;
+}
+
+/** Logical archive — keeps history (SPEC §13). */
+export async function archiveSkill(
+  db: DbClient,
+  userId: string,
+  id: string,
+): Promise<Skill | undefined> {
+  const now = new Date();
+  const [skill] = await db
+    .update(skills)
+    .set({ status: "archived", archivedAt: now, updatedAt: now })
+    .where(and(eq(skills.id, id), eq(skills.userId, userId)))
+    .returning();
   return skill;
 }

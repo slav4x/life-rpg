@@ -35,6 +35,20 @@ export async function maxCurrentStreak(
   return Number(row?.max ?? 0);
 }
 
+export async function streakSummary(
+  db: DbClient,
+  userId: string,
+): Promise<{ current: number; best: number }> {
+  const [row] = await db
+    .select({
+      current: sql<string>`coalesce(max(${streaks.currentCount}), 0)`,
+      best: sql<string>`coalesce(max(${streaks.bestCount}), 0)`,
+    })
+    .from(streaks)
+    .where(eq(streaks.userId, userId));
+  return { current: Number(row?.current ?? 0), best: Number(row?.best ?? 0) };
+}
+
 export async function maxSkillXp(db: DbClient, userId: string): Promise<number> {
   const [row] = await db
     .select({ max: sql<string>`coalesce(max(${userSkills.xp}), 0)` })

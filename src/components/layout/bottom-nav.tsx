@@ -9,9 +9,9 @@ import { cn } from "@/lib/utils";
 const ITEMS = [
   { href: "/", label: "Сегодня", icon: CalendarCheck, enabled: true },
   { href: "/quests", label: "Квесты", icon: ScrollText, enabled: true },
-  { href: "/skills", label: "Навыки", icon: Sparkles, enabled: false },
-  { href: "/progress", label: "Прогресс", icon: BarChart3, enabled: false },
-  { href: "/profile", label: "Профиль", icon: User, enabled: false },
+  { href: "/skills", label: "Навыки", icon: Sparkles, enabled: true },
+  { href: "/progress", label: "Прогресс", icon: BarChart3, enabled: true },
+  { href: "/profile", label: "Профиль", icon: User, enabled: true },
 ];
 
 export function BottomNav() {

@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
 import {
@@ -16,6 +16,39 @@ export async function insertXpTransactions(
 ): Promise<void> {
   if (rows.length === 0) return;
   await db.insert(xpTransactions).values(rows);
+}
+
+export async function listRecentTransactions(
+  db: DbClient,
+  userId: string,
+  limit = 20,
+): Promise<XpTransaction[]> {
+  return db
+    .select()
+    .from(xpTransactions)
+    .where(eq(xpTransactions.userId, userId))
+    .orderBy(desc(xpTransactions.createdAt))
+    .limit(limit);
+}
+
+export async function listSkillTransactions(
+  db: DbClient,
+  userId: string,
+  skillId: string,
+  limit = 20,
+): Promise<XpTransaction[]> {
+  return db
+    .select()
+    .from(xpTransactions)
+    .where(
+      and(
+        eq(xpTransactions.userId, userId),
+        eq(xpTransactions.skillId, skillId),
+        eq(xpTransactions.scope, "skill"),
+      ),
+    )
+    .orderBy(desc(xpTransactions.createdAt))
+    .limit(limit);
 }
 
 /** The accrual transactions written for a task completion (for reversal). */

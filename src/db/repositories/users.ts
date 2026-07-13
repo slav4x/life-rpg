@@ -44,3 +44,21 @@ export async function findUserById(
   const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
   return user;
 }
+
+export interface UpdateUserFields {
+  timezone?: string;
+  theme?: string;
+}
+
+export async function updateUser(
+  db: Database,
+  id: string,
+  fields: UpdateUserFields,
+): Promise<User | undefined> {
+  const [user] = await db
+    .update(users)
+    .set({ ...fields, updatedAt: new Date() })
+    .where(eq(users.id, id))
+    .returning();
+  return user;
+}

@@ -76,6 +76,20 @@ export async function listTasksForDate(
     .orderBy(asc(tasks.status), desc(tasks.createdAt));
 }
 
+export async function listRecentTasksBySkill(
+  db: DbClient,
+  userId: string,
+  skillId: string,
+  limit = 10,
+): Promise<Task[]> {
+  return db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.userId, userId), eq(tasks.skillId, skillId)))
+    .orderBy(desc(tasks.createdAt))
+    .limit(limit);
+}
+
 /** Fetch and row-lock a task for the completion transaction (SPEC §11). */
 export async function lockTask(
   db: DbClient,
