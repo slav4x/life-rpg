@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import type { CompleteTaskResult } from "@/application/tasks/complete-task";
+import { showAchievementToasts } from "@/components/achievements/achievement-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DIFFICULTIES } from "@/domain/game/constants";
@@ -58,6 +59,7 @@ export function TaskItem({ task }: { task: TaskVM }) {
           </span>
         ),
       });
+      showAchievementToasts(result.unlockedAchievements);
       router.refresh();
     } catch {
       toast.error("Ошибка сети");

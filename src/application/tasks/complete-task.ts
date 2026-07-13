@@ -1,5 +1,9 @@
 import { eq } from "drizzle-orm";
 
+import {
+  checkAchievements,
+  type UnlockedAchievement,
+} from "@/application/game/check-achievements";
 import { GameError } from "@/application/game/errors";
 import { recomputeStreak } from "@/application/game/recompute-streak";
 import { getDb, type Database, type Transaction } from "@/db/client";
@@ -31,6 +35,7 @@ export interface CompleteTaskResult {
   skill: { id: string; name: string; xp: number; level: number; leveledUp: boolean };
   attribute: { id: string; code: string; name: string; xp: number };
   streak: { current: number; best: number } | null;
+  unlockedAchievements: UnlockedAchievement[];
 }
 
 export interface CompleteTaskCommand {
@@ -145,6 +150,12 @@ export async function completeTask(
       ? await recomputeStreak(tx, cmd.userId, task.templateId)
       : null;
 
+    const unlockedAchievements = await checkAchievements(
+      tx,
+      cmd.userId,
+      completion.id,
+    );
+
     return {
       completionId: completion.id,
       alreadyCompleted: false,
@@ -164,6 +175,7 @@ export async function completeTask(
         xp: attributeXp,
       },
       streak,
+      unlockedAchievements,
     } satisfies CompleteTaskResult;
   });
 }
@@ -211,5 +223,6 @@ async function buildIdempotentResult(
     streak: streakRow
       ? { current: streakRow.currentCount, best: streakRow.bestCount }
       : null,
+    unlockedAchievements: [],
   };
 }

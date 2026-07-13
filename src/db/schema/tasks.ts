@@ -9,6 +9,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import { questSteps } from "./quest-steps";
 import { skills } from "./skills";
 import { taskTemplates } from "./task-templates";
 import { users } from "./users";
@@ -25,6 +26,9 @@ export const tasks = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     templateId: uuid("template_id").references(() => taskTemplates.id, {
+      onDelete: "set null",
+    }),
+    questStepId: uuid("quest_step_id").references(() => questSteps.id, {
       onDelete: "set null",
     }),
     skillId: uuid("skill_id")

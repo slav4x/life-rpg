@@ -36,6 +36,20 @@
       "when": 1783916947144,
       "tag": "0004_partial_completion_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783917305327,
+      "tag": "0005_quests_achievements",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783917312863,
+      "tag": "0006_seed_achievements",
+      "breakpoints": true
     }
   ]
 }
