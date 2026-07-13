@@ -1,0 +1,128 @@
+import { and, eq, sql } from "drizzle-orm";
+import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
+import postgres from "postgres";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+import { ensureTasksForDate } from "@/application/tasks/ensure-daily-tasks";
+import { ensureAttributes, listAttributes } from "@/db/repositories/attributes";
+import { createSkill } from "@/db/repositories/skills";
+import {
+  archiveTemplate,
+  createTemplate,
+} from "@/db/repositories/task-templates";
+import * as schema from "@/db/schema";
+import { tasks, users } from "@/db/schema";
+import { addDaysToDate, getIsoWeekday } from "@/lib/dates/local-date";
+
+const url = process.env.TEST_DATABASE_URL;
+
+describe.skipIf(!url)("ensureTasksForDate (integration)", () => {
+  let client: ReturnType<typeof postgres>;
+  let db: PostgresJsDatabase<typeof schema>;
+  let userId: string;
+  let skillId: string;
+
+  const DATE = "2026-07-13";
+
+  beforeAll(async () => {
+    client = postgres(url!, { max: 5, onnotice: () => {} });
+    db = drizzle(client, { schema });
+    await migrate(db, { migrationsFolder: "./src/db/migrations" });
+    await ensureAttributes(db);
+  });
+
+  afterAll(async () => {
+    await client?.end({ timeout: 5 });
+  });
+
+  beforeEach(async () => {
+    await db.execute(
+      sql`truncate table xp_transactions, task_completions, streaks, tasks, task_templates, user_skills, user_attributes, skills, sessions, users restart identity cascade`,
+    );
+    const [user] = await db
+      .insert(users)
+      .values({ telegramId: 710_000_001n, firstName: "Player" })
+      .returning();
+    userId = user.id;
+    const attrs = await listAttributes(db);
+    const skill = await createSkill(db, {
+      userId,
+      attributeId: attrs.find((a) => a.code === "body")!.id,
+      name: "Кардио",
+    });
+    skillId = skill.id;
+  });
+
+  it("materialises a daily template task once, even concurrently", async () => {
+    const template = await createTemplate(db, {
+      userId,
+      skillId,
+      title: "Зарядка",
+      baseXp: 20,
+      difficulty: "normal",
+      recurrenceType: "daily",
+    });
+
+    await Promise.all([
+      ensureTasksForDate(userId, DATE, db),
+      ensureTasksForDate(userId, DATE, db),
+      ensureTasksForDate(userId, DATE, db),
+    ]);
+
+    const rows = await db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.userId, userId), eq(tasks.localDate, DATE)));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].templateId).toBe(template.id);
+  });
+
+  it("only creates weekday templates on matching days", async () => {
+    const weekday = getIsoWeekday(DATE);
+    await createTemplate(db, {
+      userId,
+      skillId,
+      title: "Зал",
+      baseXp: 30,
+      difficulty: "normal",
+      recurrenceType: "weekdays",
+      weekdays: [weekday],
+    });
+
+    const otherDay = addDaysToDate(DATE, 3);
+    await ensureTasksForDate(userId, DATE, db);
+    await ensureTasksForDate(userId, otherDay, db);
+
+    const onDay = await db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.userId, userId), eq(tasks.localDate, DATE)));
+    const onOther = await db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.userId, userId), eq(tasks.localDate, otherDay)));
+    expect(onDay).toHaveLength(1);
+    expect(onOther).toHaveLength(0);
+  });
+
+  it("ignores archived templates", async () => {
+    const template = await createTemplate(db, {
+      userId,
+      skillId,
+      title: "Старое",
+      baseXp: 10,
+      difficulty: "easy",
+      recurrenceType: "daily",
+    });
+    await archiveTemplate(db, userId, template.id);
+
+    await ensureTasksForDate(userId, DATE, db);
+
+    const rows = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.userId, userId));
+    expect(rows).toHaveLength(0);
+  });
+});

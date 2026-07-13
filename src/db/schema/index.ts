@@ -4,6 +4,8 @@ export * from "./attributes";
 export * from "./user-attributes";
 export * from "./skills";
 export * from "./user-skills";
+export * from "./task-templates";
 export * from "./tasks";
 export * from "./task-completions";
 export * from "./xp-transactions";
+export * from "./streaks";

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Check, Flame } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -42,6 +42,9 @@ export function TaskItem({ task }: { task: TaskVM }) {
             <span>
               {result.attribute.name}: +{result.xp.attribute} XP
             </span>
+            {result.streak && result.streak.current > 1 && (
+              <span>Серия: {result.streak.current} 🔥</span>
+            )}
             {result.levelUp && (
               <span className="font-medium text-foreground">
                 Новый уровень: {result.levelUp.to}!
@@ -63,6 +66,23 @@ export function TaskItem({ task }: { task: TaskVM }) {
     }
   }
 
+  async function revert() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/revert`, { method: "POST" });
+      if (!res.ok) {
+        toast.error("Не удалось отменить");
+        return;
+      }
+      toast.success("Выполнение отменено");
+      router.refresh();
+    } catch {
+      toast.error("Ошибка сети");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <li className="flex items-center gap-3 rounded-xl border bg-card px-3 py-2.5">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -74,18 +94,35 @@ export function TaskItem({ task }: { task: TaskVM }) {
         >
           {task.title}
         </span>
-        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
           <Badge variant="secondary" className="font-normal">
             {task.skillName}
           </Badge>
           <span>+{task.finalXp} XP</span>
           <span>·</span>
           <span>{difficultyLabel(task.difficulty)}</span>
+          {task.streak != null && task.streak > 0 && (
+            <span className="inline-flex items-center gap-0.5 text-foreground">
+              <Flame className="size-3" />
+              {task.streak}
+            </span>
+          )}
         </span>
       </div>
 
       {done ? (
-        <Check className="size-5 shrink-0 text-primary" aria-label="Выполнено" />
+        <div className="flex shrink-0 items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-muted-foreground"
+            onClick={revert}
+            disabled={loading}
+          >
+            Отменить
+          </Button>
+          <Check className="size-5 text-primary" aria-label="Выполнено" />
+        </div>
       ) : (
         <Button
           size="sm"

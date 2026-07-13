@@ -34,6 +34,29 @@ export async function createTask(
   return task;
 }
 
+export interface TemplateTaskRow {
+  userId: string;
+  templateId: string;
+  skillId: string;
+  title: string;
+  description: string | null;
+  localDate: string;
+  baseXp: number;
+  difficulty: string;
+}
+
+/**
+ * Insert template-derived tasks, skipping any that already exist for the day.
+ * Relies on the partial unique index, so it is safe under concurrency (SPEC §12).
+ */
+export async function insertTasksFromTemplates(
+  db: DbClient,
+  rows: TemplateTaskRow[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  await db.insert(tasks).values(rows).onConflictDoNothing();
+}
+
 export interface TaskWithSkill {
   task: Task;
   skill: Skill;

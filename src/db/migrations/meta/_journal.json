@@ -22,6 +22,20 @@
       "when": 1783887580499,
       "tag": "0002_seed_attributes",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783915774034,
+      "tag": "0003_yielding_jack_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783916947144,
+      "tag": "0004_partial_completion_unique",
+      "breakpoints": true
     }
   ]
 }

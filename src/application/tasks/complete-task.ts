@@ -1,12 +1,14 @@
 import { eq } from "drizzle-orm";
 
 import { GameError } from "@/application/game/errors";
+import { recomputeStreak } from "@/application/game/recompute-streak";
 import { getDb, type Database, type Transaction } from "@/db/client";
 import {
   createCompletion,
   findActiveCompletionByTask,
 } from "@/db/repositories/completions";
 import { getSkillById } from "@/db/repositories/skills";
+import { getStreak } from "@/db/repositories/streaks";
 import { lockTask, setTaskStatus } from "@/db/repositories/tasks";
 import {
   getUserAttributeXp,
@@ -28,6 +30,7 @@ export interface CompleteTaskResult {
   levelUp: { from: number; to: number } | null;
   skill: { id: string; name: string; xp: number; level: number; leveledUp: boolean };
   attribute: { id: string; code: string; name: string; xp: number };
+  streak: { current: number; best: number } | null;
 }
 
 export interface CompleteTaskCommand {
@@ -63,7 +66,14 @@ export async function completeTask(
     // Idempotency: a repeat completion returns the prior result, no re-accrual.
     const existing = await findActiveCompletionByTask(tx, cmd.userId, cmd.taskId);
     if (existing) {
-      return buildIdempotentResult(tx, existing.id, existing.finalXp, skill, attribute, cmd.userId);
+      return buildIdempotentResult(tx, {
+        completionId: existing.id,
+        finalXp: existing.finalXp,
+        skill,
+        attribute,
+        userId: cmd.userId,
+        templateId: task.templateId,
+      });
     }
 
     if (task.status !== "pending") {
@@ -131,6 +141,10 @@ export async function completeTask(
     const skillLevelBefore = calculateLevel(skillXp - breakdown.skill);
     const skillLevelAfter = calculateLevel(skillXp);
 
+    const streak = task.templateId
+      ? await recomputeStreak(tx, cmd.userId, task.templateId)
+      : null;
+
     return {
       completionId: completion.id,
       alreadyCompleted: false,
@@ -149,20 +163,28 @@ export async function completeTask(
         name: attribute.name,
         xp: attributeXp,
       },
+      streak,
     } satisfies CompleteTaskResult;
   });
 }
 
 async function buildIdempotentResult(
   tx: Transaction,
-  completionId: string,
-  finalXp: number,
-  skill: Skill,
-  attribute: Attribute,
-  userId: string,
+  input: {
+    completionId: string;
+    finalXp: number;
+    skill: Skill;
+    attribute: Attribute;
+    userId: string;
+    templateId: string | null;
+  },
 ): Promise<CompleteTaskResult> {
+  const { completionId, finalXp, skill, attribute, userId, templateId } = input;
   const skillXp = await getUserSkillXp(tx, userId, skill.id);
   const attributeXp = await getUserAttributeXp(tx, userId, attribute.id);
+  const streakRow = templateId
+    ? await getStreak(tx, userId, templateId)
+    : undefined;
 
   return {
     completionId,
@@ -186,5 +208,8 @@ async function buildIdempotentResult(
       name: attribute.name,
       xp: attributeXp,
     },
+    streak: streakRow
+      ? { current: streakRow.currentCount, best: streakRow.bestCount }
+      : null,
   };
 }

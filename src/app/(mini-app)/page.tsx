@@ -43,6 +43,10 @@ export default async function TodayPage() {
       difficulty,
       status: task.status,
       finalXp: calculateFinalXp(task.baseXp, difficulty),
+      templateId: task.templateId,
+      streak: task.templateId
+        ? (data.streaksByTemplate[task.templateId] ?? 0)
+        : null,
     };
   });
 

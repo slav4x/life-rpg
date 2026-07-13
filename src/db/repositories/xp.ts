@@ -7,6 +7,7 @@ import {
   userSkills,
   xpTransactions,
   type NewXpTransaction,
+  type XpTransaction,
 } from "@/db/schema";
 
 export async function insertXpTransactions(
@@ -15,6 +16,24 @@ export async function insertXpTransactions(
 ): Promise<void> {
   if (rows.length === 0) return;
   await db.insert(xpTransactions).values(rows);
+}
+
+/** The accrual transactions written for a task completion (for reversal). */
+export async function getTransactionsBySource(
+  db: DbClient,
+  userId: string,
+  sourceId: string,
+): Promise<XpTransaction[]> {
+  return db
+    .select()
+    .from(xpTransactions)
+    .where(
+      and(
+        eq(xpTransactions.userId, userId),
+        eq(xpTransactions.sourceId, sourceId),
+        eq(xpTransactions.sourceType, "task_completion"),
+      ),
+    );
 }
 
 /** Total confirmed global XP for a user, from the journal (SPEC §5.1). */

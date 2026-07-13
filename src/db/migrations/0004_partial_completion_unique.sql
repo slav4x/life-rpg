@@ -1,0 +1,2 @@
+ALTER TABLE "task_completions" DROP CONSTRAINT "task_completions_user_task_unique";--> statement-breakpoint
+CREATE UNIQUE INDEX "task_completions_active_task_unique" ON "task_completions" USING btree ("user_id","task_id") WHERE "task_completions"."reverted_at" is null;

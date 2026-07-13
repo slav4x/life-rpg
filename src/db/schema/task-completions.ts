@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   date,
   integer,
@@ -5,6 +6,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -34,7 +36,11 @@ export const taskCompletions = pgTable(
       .defaultNow(),
   },
   (table) => [
-    unique("task_completions_user_task_unique").on(table.userId, table.taskId),
+    // At most one ACTIVE completion per task; reverted rows are kept as history
+    // and must not block re-completing the task (SPEC §11).
+    uniqueIndex("task_completions_active_task_unique")
+      .on(table.userId, table.taskId)
+      .where(sql`${table.revertedAt} is null`),
     unique("task_completions_user_key_unique").on(
       table.userId,
       table.idempotencyKey,

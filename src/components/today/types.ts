@@ -9,6 +9,9 @@ export interface TaskVM {
   difficulty: Difficulty;
   status: string;
   finalXp: number;
+  templateId: string | null;
+  /** Current streak for template tasks; null for one-off tasks. */
+  streak: number | null;
 }
 
 export interface SkillOption {

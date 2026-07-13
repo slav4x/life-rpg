@@ -27,8 +27,21 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { BASE_XP, DIFFICULTIES } from "@/domain/game/constants";
+import { cn } from "@/lib/utils";
 
 import type { SkillOption } from "./types";
+
+type Recurrence = "none" | "daily" | "weekdays";
+
+const WEEKDAYS = [
+  { iso: 1, label: "Пн" },
+  { iso: 2, label: "Вт" },
+  { iso: 3, label: "Ср" },
+  { iso: 4, label: "Чт" },
+  { iso: 5, label: "Пт" },
+  { iso: 6, label: "Сб" },
+  { iso: 7, label: "Вс" },
+];
 
 export function AddActionDrawer({
   date,
@@ -47,6 +60,14 @@ export function AddActionDrawer({
   const [baseXp, setBaseXp] = useState(String(BASE_XP.default));
   const [localDate, setLocalDate] = useState(date);
   const [description, setDescription] = useState("");
+  const [recurrence, setRecurrence] = useState<Recurrence>("none");
+  const [weekdays, setWeekdays] = useState<number[]>([]);
+
+  function toggleWeekday(iso: number) {
+    setWeekdays((prev) =>
+      prev.includes(iso) ? prev.filter((d) => d !== iso) : [...prev, iso],
+    );
+  }
 
   async function submit() {
     const trimmed = title.trim();
@@ -59,29 +80,50 @@ export function AddActionDrawer({
       toast.error("Некорректное значение XP");
       return;
     }
+    if (recurrence === "weekdays" && weekdays.length === 0) {
+      toast.error("Выберите дни недели");
+      return;
+    }
 
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/tasks", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
+    const isRecurring = recurrence !== "none";
+    const url = isRecurring ? "/api/task-templates" : "/api/tasks";
+    const body = isRecurring
+      ? {
+          title: trimmed,
+          skillId,
+          difficulty,
+          baseXp: xp,
+          recurrenceType: recurrence,
+          weekdays: recurrence === "weekdays" ? weekdays : undefined,
+          localDate: date,
+          description: description.trim() || undefined,
+        }
+      : {
           title: trimmed,
           skillId,
           difficulty,
           baseXp: xp,
           localDate,
           description: description.trim() || undefined,
-        }),
+        };
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         toast.error("Не удалось создать действие");
         return;
       }
-      toast.success("Действие добавлено");
+      toast.success(isRecurring ? "Повторение создано" : "Действие добавлено");
       setOpen(false);
       setTitle("");
       setDescription("");
+      setRecurrence("none");
+      setWeekdays([]);
       router.refresh();
     } catch {
       toast.error("Ошибка сети");
@@ -99,13 +141,15 @@ export function AddActionDrawer({
         </Button>
       </DrawerTrigger>
       <DrawerContent>
-        <div className="mx-auto w-full max-w-md">
+        <div className="mx-auto w-full max-w-md overflow-y-auto">
           <DrawerHeader>
             <DrawerTitle>Новое действие</DrawerTitle>
-            <DrawerDescription>Разовая задача на выбранную дату.</DrawerDescription>
+            <DrawerDescription>
+              Разовая задача или повторяющееся действие.
+            </DrawerDescription>
           </DrawerHeader>
 
-          <div className="flex flex-col gap-4 px-4">
+          <div className="flex flex-col gap-4 px-4 pb-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="task-title">Название</Label>
               <Input
@@ -163,19 +207,55 @@ export function AddActionDrawer({
                 />
               </div>
             </div>
-            <p className="-mt-2 text-xs text-muted-foreground">
-              Рекомендуется {BASE_XP.min}–{BASE_XP.max} XP.
-            </p>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="task-date">Дата</Label>
-              <Input
-                id="task-date"
-                type="date"
-                value={localDate}
-                onChange={(e) => setLocalDate(e.target.value)}
-              />
+              <Label>Повторение</Label>
+              <Select
+                value={recurrence}
+                onValueChange={(v) => setRecurrence(v as Recurrence)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Нет</SelectItem>
+                  <SelectItem value="daily">Каждый день</SelectItem>
+                  <SelectItem value="weekdays">По дням недели</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {recurrence === "weekdays" && (
+              <div className="flex flex-wrap gap-1.5">
+                {WEEKDAYS.map((d) => (
+                  <button
+                    key={d.iso}
+                    type="button"
+                    onClick={() => toggleWeekday(d.iso)}
+                    className={cn(
+                      "size-10 rounded-lg border text-sm transition-colors",
+                      weekdays.includes(d.iso)
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "bg-background hover:bg-muted",
+                    )}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {recurrence === "none" && (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="task-date">Дата</Label>
+                <Input
+                  id="task-date"
+                  type="date"
+                  value={localDate}
+                  onChange={(e) => setLocalDate(e.target.value)}
+                />
+              </div>
+            )}
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="task-desc">Описание (необязательно)</Label>
@@ -191,7 +271,7 @@ export function AddActionDrawer({
 
           <DrawerFooter>
             <Button onClick={submit} disabled={submitting}>
-              {submitting ? "Сохранение…" : "Добавить действие"}
+              {submitting ? "Сохранение…" : "Добавить"}
             </Button>
             <DrawerClose asChild>
               <Button variant="outline">Отмена</Button>

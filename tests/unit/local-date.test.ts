@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addDaysToDate,
+  getIsoWeekday,
   getLocalDate,
   isValidDateString,
   isValidTimeZone,
@@ -23,6 +25,21 @@ describe("isValidTimeZone", () => {
   it("distinguishes valid and invalid zones", () => {
     expect(isValidTimeZone("Asia/Novosibirsk")).toBe(true);
     expect(isValidTimeZone("Not/AZone")).toBe(false);
+  });
+});
+
+describe("getIsoWeekday", () => {
+  it("returns 1 for Monday and 7 for Sunday", () => {
+    expect(getIsoWeekday("2024-01-01")).toBe(1); // Monday
+    expect(getIsoWeekday("2024-01-07")).toBe(7); // Sunday
+  });
+});
+
+describe("addDaysToDate", () => {
+  it("advances and rewinds across month boundaries", () => {
+    expect(addDaysToDate("2026-07-31", 1)).toBe("2026-08-01");
+    expect(addDaysToDate("2026-03-01", -1)).toBe("2026-02-28");
+    expect(addDaysToDate("2026-07-13", 0)).toBe("2026-07-13");
   });
 });
 

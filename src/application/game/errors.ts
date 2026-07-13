@@ -1,6 +1,8 @@
 export type GameErrorCode =
   | "task_not_found"
   | "task_not_pending"
+  | "nothing_to_revert"
+  | "template_not_found"
   | "skill_not_found"
   | "attribute_not_found"
   | "invalid_input";
@@ -17,10 +19,12 @@ export class GameError extends Error {
   get status(): number {
     switch (this.code) {
       case "task_not_found":
+      case "template_not_found":
       case "skill_not_found":
       case "attribute_not_found":
         return 404;
       case "task_not_pending":
+      case "nothing_to_revert":
         return 409;
       default:
         return 400;
