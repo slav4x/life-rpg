@@ -1,7 +1,8 @@
 import { z } from "zod";
 
+import { isoDateSchema } from "./common";
+
 const questType = z.enum(["main", "side", "long_term"]);
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD");
 
 export const createQuestInputSchema = z.object({
   title: z.string().min(1).max(200),
@@ -9,8 +10,9 @@ export const createQuestInputSchema = z.object({
   type: questType,
   attributeId: z.uuid().nullish(),
   rewardXp: z.number().int().min(0).max(10000),
-  dueDate: isoDate.nullish(),
+  dueDate: isoDateSchema.nullish(),
   manualCompletion: z.boolean().optional(),
+  // A quest is a goal made of one or more measurable steps (SPEC §5.7).
   steps: z
     .array(
       z.object({
@@ -18,8 +20,8 @@ export const createQuestInputSchema = z.object({
         isRequired: z.boolean().optional(),
       }),
     )
-    .max(30)
-    .default([]),
+    .min(1)
+    .max(30),
 });
 
 export const updateQuestInputSchema = z
@@ -31,7 +33,7 @@ export const updateQuestInputSchema = z
     status: z.enum(["draft", "active", "archived"]).optional(),
     attributeId: z.uuid().nullable().optional(),
     rewardXp: z.number().int().min(0).max(10000).optional(),
-    dueDate: isoDate.nullable().optional(),
+    dueDate: isoDateSchema.nullable().optional(),
     manualCompletion: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "empty update" });

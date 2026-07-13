@@ -5,6 +5,7 @@ export type GameErrorCode =
   | "template_not_found"
   | "quest_not_found"
   | "quest_not_active"
+  | "quest_steps_incomplete"
   | "step_not_found"
   | "skill_not_found"
   | "attribute_not_found"
@@ -31,6 +32,7 @@ export class GameError extends Error {
       case "task_not_pending":
       case "nothing_to_revert":
       case "quest_not_active":
+      case "quest_steps_incomplete":
         return 409;
       default:
         return 400;

@@ -70,8 +70,15 @@ describe.skipIf(!url)("quests & achievements (integration)", () => {
     return quest;
   }
 
+  async function completeAllSteps(questId: string) {
+    for (const step of await listSteps(db, questId)) {
+      await toggleStep({ userId, stepId: step.id }, db);
+    }
+  }
+
   it("completes a quest, grants the reward and unlocks first_quest", async () => {
     const quest = await activeQuest(300);
+    await completeAllSteps(quest.id);
 
     const result = await completeQuest({ userId, questId: quest.id }, db);
 
@@ -87,12 +94,33 @@ describe.skipIf(!url)("quests & achievements (integration)", () => {
 
   it("does not double-reward on repeated completion", async () => {
     const quest = await activeQuest(300);
+    await completeAllSteps(quest.id);
     await completeQuest({ userId, questId: quest.id }, db);
 
     const again = await completeQuest({ userId, questId: quest.id }, db);
 
     expect(again.alreadyCompleted).toBe(true);
     expect(await sumGlobalXp(db, userId)).toBe(300);
+  });
+
+  it("rejects completion while required steps are unfinished", async () => {
+    const quest = await activeQuest(300);
+
+    await expect(
+      completeQuest({ userId, questId: quest.id }, db),
+    ).rejects.toMatchObject({ code: "quest_steps_incomplete" });
+    expect(await sumGlobalXp(db, userId)).toBe(0);
+  });
+
+  it("rejects toggling a step of a completed quest", async () => {
+    const quest = await activeQuest(100);
+    await completeAllSteps(quest.id);
+    await completeQuest({ userId, questId: quest.id }, db);
+
+    const [step] = await listSteps(db, quest.id);
+    await expect(
+      toggleStep({ userId, stepId: step.id }, db),
+    ).rejects.toMatchObject({ code: "quest_not_active" });
   });
 
   it("auto-completes when manual completion is off and required steps done", async () => {

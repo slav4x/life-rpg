@@ -6,8 +6,10 @@ import {
   type AttributeXp,
   type DailyXp,
 } from "@/db/repositories/progress";
-import { streakSummary } from "@/db/repositories/stats";
+import { listStreaks } from "@/db/repositories/streaks";
+import { listTemplates } from "@/db/repositories/task-templates";
 import { listRecentTransactions } from "@/db/repositories/xp";
+import { displayCurrentStreak } from "@/domain/game/streak";
 import { addDaysToDate, getLocalDate } from "@/lib/dates/local-date";
 
 export type ProgressPeriod = "7d" | "30d" | "all";
@@ -15,6 +17,10 @@ export type ProgressPeriod = "7d" | "30d" | "all";
 export function isProgressPeriod(value: string): value is ProgressPeriod {
   return value === "7d" || value === "30d" || value === "all";
 }
+
+// Cap the daily chart window so a long "all" history stays readable; the
+// period totals are computed from the full data, not this window.
+const CHART_MAX_DAYS = 90;
 
 export interface ProgressTransaction {
   amount: number;
@@ -33,11 +39,15 @@ export interface ProgressData {
   recent: ProgressTransaction[];
 }
 
+function laterDate(a: string, b: string): string {
+  return a > b ? a : b;
+}
+
 function fillDailyRange(start: string, end: string, data: DailyXp[]): DailyXp[] {
   const byDate = new Map(data.map((d) => [d.date, d.xp]));
   const out: DailyXp[] = [];
   let cursor = start;
-  for (let i = 0; i < 400 && cursor <= end; i++) {
+  while (cursor <= end) {
     out.push({ date: cursor, xp: byDate.get(cursor) ?? 0 });
     cursor = addDaysToDate(cursor, 1);
   }
@@ -58,23 +68,49 @@ export async function getProgressData(
         ? addDaysToDate(today, -29)
         : undefined;
 
-  const [dailyRaw, completedTasks, streak, attributes, recent] =
+  const [dailyRaw, completedTasks, attributes, recent, streaks, templates] =
     await Promise.all([
       xpByLocalDate(db, userId, from),
       countCompletionsFrom(db, userId, from),
-      streakSummary(db, userId),
       attributeDistribution(db, userId),
       listRecentTransactions(db, userId, 15),
+      listStreaks(db, userId),
+      listTemplates(db, userId),
     ]);
 
-  const start = from ?? dailyRaw[0]?.date ?? today;
-  const daily = fillDailyRange(start, today, dailyRaw);
+  // Totals reflect the full selected period; the chart is bounded to a window.
+  const totalXp = dailyRaw.reduce((sum, d) => sum + d.xp, 0);
+  const windowStart = laterDate(
+    from ?? dailyRaw[0]?.date ?? today,
+    addDaysToDate(today, -(CHART_MAX_DAYS - 1)),
+  );
+  const daily = fillDailyRange(windowStart, today, dailyRaw);
+
+  const ruleByTemplate = new Map(
+    templates.map((t) => [
+      t.id,
+      { recurrenceType: t.recurrenceType, weekdays: t.weekdays },
+    ]),
+  );
+  let currentStreak = 0;
+  let bestStreak = 0;
+  for (const s of streaks) {
+    const rule = ruleByTemplate.get(s.templateId) ?? {
+      recurrenceType: "daily",
+      weekdays: null,
+    };
+    currentStreak = Math.max(
+      currentStreak,
+      displayCurrentStreak(s.currentCount, rule, s.lastCompletedDate, today),
+    );
+    bestStreak = Math.max(bestStreak, s.bestCount);
+  }
 
   return {
     period,
-    totalXp: daily.reduce((sum, d) => sum + d.xp, 0),
+    totalXp,
     completedTasks,
-    streak,
+    streak: { current: currentStreak, best: bestStreak },
     daily,
     attributes,
     recent: recent.map((t) => ({

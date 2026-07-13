@@ -27,17 +27,17 @@ export async function toggleStep(
     const step = await getStepForUser(tx, cmd.userId, cmd.stepId);
     if (!step) throw new GameError("step_not_found", "Step not found");
 
+    // Steps of a completed/archived quest are frozen.
+    const quest = await lockQuest(tx, cmd.userId, step.questId);
+    if (!quest || quest.status !== "active") {
+      throw new GameError("quest_not_active", "Quest is not active");
+    }
+
     const nowCompleted = step.completedAt === null;
     await setStepCompleted(tx, step.id, nowCompleted ? new Date() : null);
 
     let questCompleted: QuestCompletionOutcome | null = null;
-    const quest = await lockQuest(tx, cmd.userId, step.questId);
-    if (
-      nowCompleted &&
-      quest &&
-      quest.status === "active" &&
-      !quest.manualCompletion
-    ) {
+    if (nowCompleted && !quest.manualCompletion) {
       const steps = await listSteps(tx, quest.id);
       if (computeQuestProgress(steps).allRequiredDone) {
         questCompleted = await awardQuestCompletion(tx, cmd.userId, quest);

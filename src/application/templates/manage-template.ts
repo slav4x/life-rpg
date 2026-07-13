@@ -19,7 +19,11 @@ export async function updateUserTemplate(
   id: string,
   fields: UpdateTemplateFields,
 ): Promise<TaskTemplate> {
-  const template = await updateTemplate(getDb(), userId, id, fields);
+  // Switching to a daily recurrence clears any leftover weekday list.
+  const normalized: UpdateTemplateFields =
+    fields.recurrenceType === "daily" ? { ...fields, weekdays: null } : fields;
+
+  const template = await updateTemplate(getDb(), userId, id, normalized);
   if (!template) throw new GameError("template_not_found", "Template not found");
   return template;
 }

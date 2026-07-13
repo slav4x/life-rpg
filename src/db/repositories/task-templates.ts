@@ -100,6 +100,25 @@ export async function updateTemplate(
   return template;
 }
 
+/** Archive every active template that uses a skill (skill archive cascade). */
+export async function archiveTemplatesBySkill(
+  db: DbClient,
+  userId: string,
+  skillId: string,
+): Promise<void> {
+  const now = new Date();
+  await db
+    .update(taskTemplates)
+    .set({ isActive: false, archivedAt: now, updatedAt: now })
+    .where(
+      and(
+        eq(taskTemplates.userId, userId),
+        eq(taskTemplates.skillId, skillId),
+        isNull(taskTemplates.archivedAt),
+      ),
+    );
+}
+
 /** Logical archive — history is preserved (SPEC §13). */
 export async function archiveTemplate(
   db: DbClient,

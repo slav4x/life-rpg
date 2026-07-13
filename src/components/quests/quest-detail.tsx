@@ -47,6 +47,9 @@ export function QuestDetail({
     ? Math.round((completedCount / steps.length) * 100)
     : 0;
   const isCompleted = quest.status === "completed";
+  const allRequiredDone = steps
+    .filter((s) => s.isRequired)
+    .every((s) => s.completed);
 
   async function toggle(stepId: string) {
     setBusy(true);
@@ -156,7 +159,11 @@ export function QuestDetail({
       ) : (
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button disabled={busy}>Завершить квест</Button>
+            <Button disabled={busy || !allRequiredDone}>
+              {allRequiredDone
+                ? "Завершить квест"
+                : "Выполните обязательные шаги"}
+            </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>

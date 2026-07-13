@@ -4,7 +4,9 @@ import {
   type QuestCompletionOutcome,
 } from "@/application/quests/award-completion";
 import { getDb, type Database } from "@/db/client";
+import { listSteps } from "@/db/repositories/quest-steps";
 import { lockQuest } from "@/db/repositories/quests";
+import { computeQuestProgress } from "@/domain/game/quest";
 
 export interface CompleteQuestResult extends QuestCompletionOutcome {
   questId: string;
@@ -31,6 +33,15 @@ export async function completeQuest(
     }
     if (quest.status === "archived") {
       throw new GameError("quest_not_active", "Quest is not active");
+    }
+
+    // All required steps must be done before a quest can be completed (SPEC §5.7).
+    const steps = await listSteps(tx, quest.id);
+    if (!computeQuestProgress(steps).allRequiredDone) {
+      throw new GameError(
+        "quest_steps_incomplete",
+        "Not all required steps are completed",
+      );
     }
 
     const outcome = await awardQuestCompletion(tx, cmd.userId, quest);

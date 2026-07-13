@@ -45,6 +45,21 @@ describe("parseEnv", () => {
       /Invalid environment variables/,
     );
   });
+
+  it("requires runtime secrets in production", () => {
+    expect(() => parseEnv({ NODE_ENV: "production" })).toThrow(
+      /required in production/,
+    );
+
+    const env = parseEnv({
+      NODE_ENV: "production",
+      DATABASE_URL: "postgresql://u:p@h/db",
+      TELEGRAM_BOT_TOKEN: "123:abc",
+      ALLOWED_TELEGRAM_USER_IDS: "1",
+      APP_URL: "https://life.example.com",
+    });
+    expect(env.NODE_ENV).toBe("production");
+  });
 });
 
 describe("getAllowedTelegramUserIds", () => {
@@ -80,7 +95,14 @@ describe("isDevAuthBypassEnabled", () => {
   it("is always disabled in production", () => {
     expect(
       isDevAuthBypassEnabled(
-        parseEnv({ DEV_AUTH_BYPASS: "1", NODE_ENV: "production" }),
+        parseEnv({
+          DEV_AUTH_BYPASS: "1",
+          NODE_ENV: "production",
+          DATABASE_URL: "postgresql://u:p@h/db",
+          TELEGRAM_BOT_TOKEN: "123:abc",
+          ALLOWED_TELEGRAM_USER_IDS: "1",
+          APP_URL: "https://life.example.com",
+        }),
       ),
     ).toBe(false);
   });

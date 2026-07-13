@@ -60,6 +60,10 @@ export function CreateQuestDrawer() {
       toast.error("Укажите название квеста");
       return;
     }
+    if (cleanSteps.length === 0) {
+      toast.error("Добавьте хотя бы один шаг");
+      return;
+    }
     if (!Number.isFinite(reward) || reward < 0) {
       toast.error("Некорректная награда");
       return;

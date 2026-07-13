@@ -3,8 +3,8 @@ import { countCompletedQuests } from "@/db/repositories/quests";
 import {
   countCompletedTasks,
   countStartedAttributes,
-  maxCurrentStreak,
   maxSkillXp,
+  streakSummary,
 } from "@/db/repositories/stats";
 import { sumGlobalXp } from "@/db/repositories/xp";
 import type { AchievementStats } from "@/domain/game/achievements";
@@ -20,7 +20,8 @@ export async function computeAchievementStats(
 ): Promise<AchievementStats> {
   const totalXp = await sumGlobalXp(db, userId);
   const tasksCompleted = await countCompletedTasks(db, userId);
-  const maxStreak = await maxCurrentStreak(db, userId);
+  // "Maintain a 7-day streak" is earned once reached — use the best ever.
+  const maxStreak = (await streakSummary(db, userId)).best;
   const questsCompleted = await countCompletedQuests(db, userId);
   const topSkillXp = await maxSkillXp(db, userId);
   const attributesStarted = await countStartedAttributes(db, userId);

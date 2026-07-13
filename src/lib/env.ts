@@ -41,6 +41,25 @@ export const envSchema = z.object({
   DEV_AUTH_BYPASS: z.string().optional(),
   DEV_TELEGRAM_ID: z.coerce.number().int().positive().optional(),
   DEV_FIRST_NAME: z.string().optional(),
+}).superRefine((val, ctx) => {
+  // In production the runtime secrets must be present (backlog P0). The Docker
+  // build sets SKIP_ENV_VALIDATION so this never blocks `next build`.
+  if (val.NODE_ENV !== "production") return;
+  const required = [
+    "DATABASE_URL",
+    "TELEGRAM_BOT_TOKEN",
+    "ALLOWED_TELEGRAM_USER_IDS",
+    "APP_URL",
+  ] as const;
+  for (const key of required) {
+    if (!val[key]) {
+      ctx.addIssue({
+        code: "custom",
+        path: [key],
+        message: `${key} is required in production`,
+      });
+    }
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -73,7 +92,10 @@ export function parseEnv(
 
 const skipValidation =
   process.env.SKIP_ENV_VALIDATION === "1" ||
-  process.env.SKIP_ENV_VALIDATION === "true";
+  process.env.SKIP_ENV_VALIDATION === "true" ||
+  // `next build` collects page data with NODE_ENV=production but without the
+  // runtime secrets; validate at runtime, not during the build.
+  process.env.NEXT_PHASE === "phase-production-build";
 
 export const env: Env = skipValidation
   ? (process.env as unknown as Env)

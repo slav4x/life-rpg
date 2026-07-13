@@ -1,18 +1,25 @@
 import { z } from "zod";
 
+import { isoDateSchema } from "./common";
+
 const difficulty = z.enum(["easy", "normal", "hard", "epic"]);
 const weekdays = z.array(z.number().int().min(1).max(7)).min(1).max(7);
 
-export const createTemplateInputSchema = z.object({
-  title: z.string().min(1).max(200),
-  description: z.string().max(2000).optional(),
-  skillId: z.uuid(),
-  baseXp: z.number().int().min(1).max(1000),
-  difficulty,
-  recurrenceType: z.enum(["daily", "weekdays"]),
-  weekdays: weekdays.optional(),
-  localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD"),
-});
+export const createTemplateInputSchema = z
+  .object({
+    title: z.string().min(1).max(200),
+    description: z.string().max(2000).optional(),
+    skillId: z.uuid(),
+    baseXp: z.number().int().min(1).max(1000),
+    difficulty,
+    recurrenceType: z.enum(["daily", "weekdays"]),
+    weekdays: weekdays.optional(),
+    localDate: isoDateSchema,
+  })
+  .refine((v) => v.recurrenceType !== "weekdays" || Boolean(v.weekdays), {
+    message: "weekdays are required for the weekdays recurrence",
+    path: ["weekdays"],
+  });
 
 export const updateTemplateInputSchema = z
   .object({
@@ -24,7 +31,14 @@ export const updateTemplateInputSchema = z
     weekdays: weekdays.nullable().optional(),
     isActive: z.boolean().optional(),
   })
-  .refine((v) => Object.keys(v).length > 0, { message: "empty update" });
+  .refine((v) => Object.keys(v).length > 0, { message: "empty update" })
+  // Switching to the weekdays recurrence must include the days.
+  .refine(
+    (v) =>
+      v.recurrenceType !== "weekdays" ||
+      (Array.isArray(v.weekdays) && v.weekdays.length > 0),
+    { message: "weekdays are required for the weekdays recurrence", path: ["weekdays"] },
+  );
 
 export type CreateTemplateInput = z.infer<typeof createTemplateInputSchema>;
 export type UpdateTemplateInput = z.infer<typeof updateTemplateInputSchema>;
