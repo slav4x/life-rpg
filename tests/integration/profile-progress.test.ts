@@ -8,6 +8,7 @@ import { exportUserData } from "@/application/profile/export";
 import {
   importBackup,
   importContentPack,
+  previewContentPack,
 } from "@/application/profile/import-data";
 import { getProfileData } from "@/application/profile/get-profile";
 import { updateUserProfile } from "@/application/profile/update-profile";
@@ -208,14 +209,29 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
     };
 
     const first = await importContentPack(userId, pack, db);
-    expect(first.created).toEqual({ skills: 1, taskTemplates: 1, quests: 1 });
+    expect(first.created).toEqual({
+      skills: 1,
+      tasks: 0,
+      taskTemplates: 1,
+      quests: 1,
+    });
     const [importedTemplate] = await db.select().from(schema.taskTemplates);
     expect(importedTemplate.estimatedMinutes).toBe(20);
     expect(importedTemplate.startsOn).toBe(today);
 
     const second = await importContentPack(userId, pack, db);
-    expect(second.created).toEqual({ skills: 0, taskTemplates: 0, quests: 0 });
-    expect(second.skipped).toEqual({ skills: 1, taskTemplates: 1, quests: 1 });
+    expect(second.created).toEqual({
+      skills: 0,
+      tasks: 0,
+      taskTemplates: 0,
+      quests: 0,
+    });
+    expect(second.skipped).toEqual({
+      skills: 1,
+      tasks: 0,
+      taskTemplates: 1,
+      quests: 1,
+    });
 
     await expect(
       importContentPack(
@@ -227,6 +243,116 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
         db,
       ),
     ).rejects.toMatchObject({ code: "conflict" });
+  });
+
+  it("previews and imports portable v2 content with dependency-safe selection", async () => {
+    const pack = {
+      format: "life-rpg-content-pack",
+      formatVersion: 2,
+      name: "Пак v2",
+      skills: [
+        {
+          key: "planning",
+          name: "Планирование",
+          attributeCode: "discipline",
+        },
+      ],
+      tasks: [
+        {
+          title: "Разобрать входящие",
+          skillKey: "planning",
+          baseXp: 25,
+          difficulty: "normal",
+          estimatedMinutes: 30,
+          scheduledInDays: 2,
+        },
+      ],
+      taskTemplates: [
+        {
+          title: "План на день",
+          skillKey: "planning",
+          baseXp: 15,
+          difficulty: "easy",
+          recurrenceType: "daily",
+          estimatedMinutes: 10,
+          startsInDays: 1,
+          endsInDays: 30,
+        },
+      ],
+      quests: [
+        {
+          title: "Настроить систему",
+          type: "main",
+          attributeCode: "discipline",
+          rewardXp: 300,
+          dueInDays: 14,
+          steps: [{ title: "Собрать первый план" }],
+        },
+      ],
+    } as const;
+
+    const dependencyPreview = await previewContentPack(
+      userId,
+      pack,
+      {
+        anchorDate: today,
+        selection: {
+          skills: false,
+          tasks: true,
+          taskTemplates: false,
+          quests: false,
+        },
+      },
+      db,
+    );
+    expect(dependencyPreview.summary.rejected.tasks).toBe(1);
+    expect(dependencyPreview.conflicts[0]).toContain("выберите импорт навыков");
+
+    const preview = await previewContentPack(
+      userId,
+      pack,
+      { anchorDate: today },
+      db,
+    );
+    expect(preview.summary.created).toEqual({
+      skills: 1,
+      tasks: 1,
+      taskTemplates: 1,
+      quests: 1,
+    });
+    expect(preview.conflicts).toEqual([]);
+
+    await importContentPack(userId, pack, db, { anchorDate: today });
+    const [task] = await db
+      .select()
+      .from(schema.tasks)
+      .where(eq(schema.tasks.title, "Разобрать входящие"));
+    expect(task.localDate).toBe(addDaysToDate(today, 2));
+    expect(task.estimatedMinutes).toBe(30);
+    const [template] = await db
+      .select()
+      .from(schema.taskTemplates)
+      .where(eq(schema.taskTemplates.title, "План на день"));
+    expect(template.startsOn).toBe(addDaysToDate(today, 1));
+    expect(template.endsOn).toBe(addDaysToDate(today, 30));
+    const [quest] = await db
+      .select()
+      .from(schema.quests)
+      .where(eq(schema.quests.title, "Настроить систему"));
+    expect(quest.dueDate).toBe(addDaysToDate(today, 14));
+
+    const repeated = await previewContentPack(
+      userId,
+      pack,
+      { anchorDate: today },
+      db,
+    );
+    expect(repeated.summary.skipped).toEqual({
+      skills: 1,
+      tasks: 1,
+      taskTemplates: 1,
+      quests: 1,
+    });
   });
 
   it("restores a versioned export only with explicit replacement", async () => {

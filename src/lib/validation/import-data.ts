@@ -195,56 +195,118 @@ const packSkill = z.object({
   color: z.enum(SKILL_COLORS).optional(),
 });
 
-const packTemplate = z
+const packTemplateFields = {
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  skillKey: z.string().min(1).max(80),
+  baseXp: z.number().int().min(5).max(250),
+  difficulty,
+  recurrenceType,
+  weekdays: z.array(z.number().int().min(1).max(7)).min(1).max(7).optional(),
+  estimatedMinutes: z.number().int().min(1).max(1440).optional(),
+};
+
+const packTemplateV1 = z
+  .object(packTemplateFields)
+  .refine(
+    (value) => value.recurrenceType !== "weekdays" || Boolean(value.weekdays),
+    { path: ["weekdays"], message: "weekdays are required" },
+  );
+
+const packTemplateV2 = z
+  .object({
+    ...packTemplateFields,
+    startsInDays: z.number().int().min(0).max(3650).optional(),
+    endsInDays: z.number().int().min(0).max(3650).optional(),
+  })
+  .strict()
+  .refine(
+    (value) => value.recurrenceType !== "weekdays" || Boolean(value.weekdays),
+    { path: ["weekdays"], message: "weekdays are required" },
+  )
+  .refine(
+    (value) =>
+      value.endsInDays === undefined ||
+      value.endsInDays >= (value.startsInDays ?? 0),
+    { path: ["endsInDays"], message: "endsInDays precedes startsInDays" },
+  );
+
+const packTask = z
   .object({
     title: z.string().min(1).max(200),
     description: z.string().max(2000).optional(),
     skillKey: z.string().min(1).max(80),
     baseXp: z.number().int().min(5).max(250),
     difficulty,
-    recurrenceType,
-    weekdays: z.array(z.number().int().min(1).max(7)).min(1).max(7).optional(),
     estimatedMinutes: z.number().int().min(1).max(1440).optional(),
+    scheduledInDays: z.number().int().min(0).max(3650).optional(),
   })
+  .strict();
+
+const packQuestFields = {
+  title: z.string().min(1).max(200),
+  description: z.string().max(2000).optional(),
+  type: questType,
+  attributeCode: attributeCode.optional(),
+  rewardXp: z.number().int().min(0).max(10000),
+  manualCompletion: z.boolean().optional(),
+  steps: z
+    .array(
+      z.object({
+        title: z.string().min(1).max(200),
+        description: z.string().max(2000).optional(),
+        isRequired: z.boolean().optional(),
+      }),
+    )
+    .min(1)
+    .max(30),
+};
+
+const requiredStepRefinement = {
+  path: ["steps"],
+  message: "at least one required step is needed",
+};
+
+const packQuestV1 = z
+  .object({ ...packQuestFields, dueDate: isoDateSchema.optional() })
   .refine(
-    (value) => value.recurrenceType !== "weekdays" || Boolean(value.weekdays),
-    { path: ["weekdays"], message: "weekdays are required" },
+    (quest) => quest.steps.some((step) => step.isRequired !== false),
+    requiredStepRefinement,
+  );
+const packQuestV2 = z
+  .object({
+    ...packQuestFields,
+    dueInDays: z.number().int().min(0).max(3650).optional(),
+  })
+  .strict()
+  .refine(
+    (quest) => quest.steps.some((step) => step.isRequired !== false),
+    requiredStepRefinement,
   );
 
-const packQuest = z
-  .object({
-    title: z.string().min(1).max(200),
-    description: z.string().max(2000).optional(),
-    type: questType,
-    attributeCode: attributeCode.optional(),
-    rewardXp: z.number().int().min(0).max(10000),
-    dueDate: isoDateSchema.optional(),
-    manualCompletion: z.boolean().optional(),
-    steps: z
-      .array(
-        z.object({
-          title: z.string().min(1).max(200),
-          description: z.string().max(2000).optional(),
-          isRequired: z.boolean().optional(),
-        }),
-      )
-      .min(1)
-      .max(30),
-  })
-  .refine((quest) => quest.steps.some((step) => step.isRequired !== false), {
-    path: ["steps"],
-    message: "at least one required step is needed",
-  });
+const contentPackV1Schema = z.object({
+  format: z.literal("life-rpg-content-pack"),
+  formatVersion: z.literal(1),
+  name: z.string().min(1).max(200),
+  skills: z.array(packSkill).max(100),
+  taskTemplates: z.array(packTemplateV1).max(500),
+  quests: z.array(packQuestV1).max(200),
+});
 
-export const contentPackSchema = z
+const contentPackV2Schema = z
   .object({
     format: z.literal("life-rpg-content-pack"),
-    formatVersion: z.literal(1),
+    formatVersion: z.literal(2),
     name: z.string().min(1).max(200),
     skills: z.array(packSkill).max(100),
-    taskTemplates: z.array(packTemplate).max(500),
-    quests: z.array(packQuest).max(200),
+    tasks: z.array(packTask).max(500).default([]),
+    taskTemplates: z.array(packTemplateV2).max(500),
+    quests: z.array(packQuestV2).max(200),
   })
+  .strict();
+
+export const contentPackSchema = z
+  .discriminatedUnion("formatVersion", [contentPackV1Schema, contentPackV2Schema])
   .superRefine((pack, context) => {
     const keys = new Set<string>();
     const names = new Set<string>();
@@ -276,7 +338,22 @@ export const contentPackSchema = z
         });
       }
     }
+    if (pack.formatVersion === 2) {
+      for (const [index, task] of pack.tasks.entries()) {
+        if (!keys.has(task.skillKey)) {
+          context.addIssue({
+            code: "custom",
+            path: ["tasks", index, "skillKey"],
+            message: "unknown skill key",
+          });
+        }
+      }
+    }
   });
+
+export type PackTask = z.infer<typeof packTask>;
+export type PackTemplateV2 = z.infer<typeof packTemplateV2>;
+export type PackQuestV2 = z.infer<typeof packQuestV2>;
 
 export type BackupImport = z.infer<typeof backupImportSchema>;
 export type ContentPack = z.infer<typeof contentPackSchema>;

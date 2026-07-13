@@ -228,10 +228,11 @@ test("restores an archived template after resolving a title conflict", async ({
 test("imports a content pack and reports conflicts", async ({ page }) => {
   const suffix = Date.now();
   const skillName = `E2E контент ${suffix}`;
+  const taskTitle = `E2E задача ${suffix}`;
   const questTitle = `E2E цель ${suffix}`;
   const pack = {
     format: "life-rpg-content-pack",
-    formatVersion: 1,
+    formatVersion: 2,
     name: `E2E пак ${suffix}`,
     skills: [
       {
@@ -242,6 +243,16 @@ test("imports a content pack and reports conflicts", async ({ page }) => {
         color: "#F59E0B",
       },
     ],
+    tasks: [
+      {
+        title: taskTitle,
+        skillKey: `content-${suffix}`,
+        baseXp: 20,
+        difficulty: "normal",
+        estimatedMinutes: 15,
+        scheduledInDays: 0,
+      },
+    ],
     taskTemplates: [
       {
         title: `E2E повторение ${suffix}`,
@@ -249,6 +260,8 @@ test("imports a content pack and reports conflicts", async ({ page }) => {
         baseXp: 20,
         difficulty: "normal",
         recurrenceType: "daily",
+        startsInDays: 0,
+        endsInDays: 30,
       },
     ],
     quests: [
@@ -257,6 +270,7 @@ test("imports a content pack and reports conflicts", async ({ page }) => {
         type: "side",
         attributeCode: "discipline",
         rewardXp: 100,
+        dueInDays: 14,
         steps: [{ title: "Сделать первый шаг" }],
       },
     ],
@@ -275,10 +289,17 @@ test("imports a content pack and reports conflicts", async ({ page }) => {
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify(pack)),
   });
+  const preview = page.locator("[data-content-pack-preview]");
+  await expect(preview.getByText(new RegExp(`v${pack.formatVersion}`))).toBeVisible();
+  await preview.getByLabel("Квесты").click();
+  await preview.getByRole("button", { name: "Подтвердить импорт" }).click();
   await expect(page.getByText("Данные импортированы")).toBeVisible();
 
+  await page.getByRole("link", { name: "Сегодня" }).click();
+  await expect(page.getByText(taskTitle)).toBeVisible();
   await page.getByRole("link", { name: "Навыки" }).click();
-  await expect(page.getByText(skillName)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Навыки" })).toBeVisible();
+  await expect(page.getByText(skillName, { exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Профиль" }).click();
   await page.locator("#content-pack-import").setInputFiles({
     name: "content-pack-conflict.json",
@@ -290,7 +311,11 @@ test("imports a content pack and reports conflicts", async ({ page }) => {
       }),
     ),
   });
-  await expect(page.getByText("Импорт остановлен")).toBeVisible();
+  const conflictPreview = page.locator("[data-content-pack-preview]");
+  await expect(conflictPreview.getByText("Импорт нельзя подтвердить:")).toBeVisible();
+  await expect(
+    conflictPreview.getByRole("button", { name: "Подтвердить импорт" }),
+  ).toBeDisabled();
 });
 
 test("creates, edits, archives and links a quest step to a task", async ({ page }) => {

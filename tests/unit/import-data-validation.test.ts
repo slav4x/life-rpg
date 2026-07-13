@@ -54,4 +54,57 @@ describe("content pack validation", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  it("accepts portable dates and one-off tasks in v2", () => {
+    const v2 = {
+      ...base,
+      formatVersion: 2,
+      tasks: [
+        {
+          title: "Разобрать входящие",
+          skillKey: "focus",
+          baseXp: 20,
+          difficulty: "normal",
+          estimatedMinutes: 30,
+          scheduledInDays: 2,
+        },
+      ],
+      taskTemplates: [
+        {
+          title: "Ежедневный фокус",
+          skillKey: "focus",
+          baseXp: 15,
+          difficulty: "easy",
+          recurrenceType: "daily",
+          startsInDays: 1,
+          endsInDays: 30,
+        },
+      ],
+      quests: [
+        {
+          title: "Закрыть проект",
+          type: "main",
+          rewardXp: 300,
+          dueInDays: 14,
+          steps: [{ title: "Сделать результат" }],
+        },
+      ],
+    } as const;
+
+    expect(contentPackSchema.safeParse(v2).success).toBe(true);
+    expect(
+      contentPackSchema.safeParse({
+        ...v2,
+        taskTemplates: [
+          { ...v2.taskTemplates[0], startsInDays: 10, endsInDays: 5 },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      contentPackSchema.safeParse({
+        ...v2,
+        quests: [{ ...v2.quests[0], dueDate: "2026-08-01" }],
+      }).success,
+    ).toBe(false);
+  });
 });

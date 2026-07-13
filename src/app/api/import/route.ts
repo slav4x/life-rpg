@@ -6,15 +6,27 @@ import {
   DataImportError,
   importBackup,
   importContentPack,
+  previewContentPack,
 } from "@/application/profile/import-data";
 import { isTrustedOrigin } from "@/lib/http/origin";
+import { isoDateSchema } from "@/lib/validation/common";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const requestSchema = z.object({
   kind: z.enum(["backup", "content_pack"]),
+  mode: z.enum(["preview", "commit"]).optional(),
   replace: z.boolean().optional(),
+  anchorDate: isoDateSchema.optional(),
+  selection: z
+    .object({
+      skills: z.boolean(),
+      tasks: z.boolean(),
+      taskTemplates: z.boolean(),
+      quests: z.boolean(),
+    })
+    .optional(),
   data: z.unknown(),
 });
 
@@ -39,6 +51,16 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (
+      parsed.data.kind === "content_pack" &&
+      parsed.data.mode === "preview"
+    ) {
+      const preview = await previewContentPack(user.id, parsed.data.data, {
+        anchorDate: parsed.data.anchorDate,
+        selection: parsed.data.selection,
+      });
+      return NextResponse.json({ ok: true, preview });
+    }
     const summary =
       parsed.data.kind === "backup"
         ? await importBackup(
@@ -46,7 +68,10 @@ export async function POST(request: Request) {
             parsed.data.data,
             parsed.data.replace ?? false,
           )
-        : await importContentPack(user.id, parsed.data.data);
+        : await importContentPack(user.id, parsed.data.data, undefined, {
+            anchorDate: parsed.data.anchorDate,
+            selection: parsed.data.selection,
+          });
     return NextResponse.json({ ok: true, summary });
   } catch (error) {
     if (error instanceof DataImportError) {
