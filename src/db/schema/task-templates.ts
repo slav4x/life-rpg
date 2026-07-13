@@ -31,6 +31,7 @@ export const taskTemplates = pgTable("task_templates", {
   description: text("description"),
   baseXp: integer("base_xp").notNull(),
   difficulty: text("difficulty").notNull(),
+  priority: text("priority").notNull().default("normal"),
   // "daily" | "weekdays"
   recurrenceType: text("recurrence_type").notNull(),
   // ISO weekdays (1=Mon .. 7=Sun) when recurrenceType is "weekdays".
@@ -53,6 +54,10 @@ export const taskTemplates = pgTable("task_templates", {
   check(
     "task_templates_difficulty_check",
     sql`${table.difficulty} in ('easy', 'normal', 'hard', 'epic')`,
+  ),
+  check(
+    "task_templates_priority_check",
+    sql`${table.priority} in ('high', 'normal', 'low')`,
   ),
   check(
     "task_templates_estimated_minutes_check",

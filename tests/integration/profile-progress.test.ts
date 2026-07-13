@@ -22,7 +22,7 @@ import { createSkill } from "@/db/repositories/skills";
 import { createTask } from "@/db/repositories/tasks";
 import * as schema from "@/db/schema";
 import { skills, users } from "@/db/schema";
-import { addDaysToDate } from "@/lib/dates/local-date";
+import { addDaysToDate, getIsoWeekday } from "@/lib/dates/local-date";
 
 const url = process.env.TEST_DATABASE_URL;
 const today = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(
@@ -113,6 +113,55 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
     expect(
       data.recent.find((event) => event.title === "Квест статистики"),
     ).toMatchObject({ kind: "quest", amount: 75 });
+    expect(data.week.completedQuests).toBe(1);
+    expect(data.week.xp).toBeGreaterThanOrEqual(125);
+    expect(data.week.directions[0]).toMatchObject({ code: "mind" });
+  });
+
+  it("reports missed weekly tasks and per-template streaks", async () => {
+    const weekStart = addDaysToDate(today, 1 - getIsoWeekday(today));
+    if (weekStart < today) {
+      await createTask(db, {
+        userId,
+        skillId,
+        title: "Пропущено на неделе",
+        localDate: weekStart,
+        baseXp: 20,
+        difficulty: "normal",
+      });
+    }
+    const [template] = await db
+      .insert(schema.taskTemplates)
+      .values({
+        userId,
+        skillId,
+        title: "Ежедневная практика",
+        baseXp: 20,
+        difficulty: "normal",
+        recurrenceType: "daily",
+        startsOn: weekStart,
+      })
+      .returning();
+    const task = await createTask(db, {
+      userId,
+      skillId,
+      title: template.title,
+      localDate: today,
+      baseXp: 20,
+      difficulty: "normal",
+    });
+    await db.update(schema.tasks).set({ templateId: template.id }).where(eq(schema.tasks.id, task.id));
+    await completeTask({ userId, taskId: task.id, idempotencyKey: task.id }, db);
+
+    const data = await getProgressData(userId, "7d", "UTC", db);
+    expect(data.week.missedTasks).toBe(weekStart < today ? 1 : 0);
+    expect(data.templateStreaks).toContainEqual(
+      expect.objectContaining({
+        templateId: template.id,
+        current: 1,
+        weeklyCompletions: 1,
+      }),
+    );
   });
 
   it("excludes future-dated legacy completions from progress statistics", async () => {
@@ -263,6 +312,7 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
           skillKey: "planning",
           baseXp: 25,
           difficulty: "normal",
+          priority: "high",
           estimatedMinutes: 30,
           scheduledInDays: 2,
         },
@@ -273,6 +323,7 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
           skillKey: "planning",
           baseXp: 15,
           difficulty: "easy",
+          priority: "low",
           recurrenceType: "daily",
           estimatedMinutes: 10,
           startsInDays: 1,
@@ -329,12 +380,14 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
       .where(eq(schema.tasks.title, "Разобрать входящие"));
     expect(task.localDate).toBe(addDaysToDate(today, 2));
     expect(task.estimatedMinutes).toBe(30);
+    expect(task.priority).toBe("high");
     const [template] = await db
       .select()
       .from(schema.taskTemplates)
       .where(eq(schema.taskTemplates.title, "План на день"));
     expect(template.startsOn).toBe(addDaysToDate(today, 1));
     expect(template.endsOn).toBe(addDaysToDate(today, 30));
+    expect(template.priority).toBe("low");
     const [quest] = await db
       .select()
       .from(schema.quests)

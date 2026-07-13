@@ -9,7 +9,7 @@ import { TelegramLogin } from "@/components/auth/telegram-login";
 import { TodayScreen } from "@/components/today/today-screen";
 import type { TaskVM } from "@/components/today/types";
 import { calculateFinalXp } from "@/domain/game/calculate-xp";
-import { isDifficulty } from "@/domain/game/constants";
+import { isDifficulty, isTaskPriority } from "@/domain/game/constants";
 import {
   addDaysToDate,
   getLocalDate,
@@ -68,6 +68,7 @@ export default async function TodayPage({
       skillName: skill.name,
       baseXp: task.baseXp,
       difficulty,
+      priority: isTaskPriority(task.priority) ? task.priority : "normal",
       status: task.status,
       finalXp: calculateFinalXp(task.baseXp, difficulty),
       estimatedMinutes: task.estimatedMinutes,

@@ -1,4 +1,4 @@
-import type { Difficulty } from "@/domain/game/constants";
+import type { Difficulty, TaskPriority } from "@/domain/game/constants";
 
 export interface TaskVM {
   id: string;
@@ -8,6 +8,7 @@ export interface TaskVM {
   skillName: string;
   baseXp: number;
   difficulty: Difficulty;
+  priority: TaskPriority;
   status: string;
   finalXp: number;
   estimatedMinutes: number | null;

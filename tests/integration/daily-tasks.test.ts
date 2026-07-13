@@ -14,7 +14,7 @@ import {
   archiveTemplate,
   createTemplate,
 } from "@/db/repositories/task-templates";
-import { createTask } from "@/db/repositories/tasks";
+import { createTask, listTasksForDate } from "@/db/repositories/tasks";
 import * as schema from "@/db/schema";
 import { tasks, users } from "@/db/schema";
 import { addDaysToDate, getIsoWeekday } from "@/lib/dates/local-date";
@@ -158,6 +158,31 @@ describe.skipIf(!url)("ensureTasksForDate (integration)", () => {
     expect(summary.nextSeven.map((item) => item.date)).toEqual([
       DATE,
       addDaysToDate(DATE, 3),
+    ]);
+  });
+
+  it("orders pending tasks by explicit priority", async () => {
+    for (const [title, priority] of [
+      ["Обычная", "normal"],
+      ["Низкая", "low"],
+      ["Срочная", "high"],
+    ] as const) {
+      await createTask(db, {
+        userId,
+        skillId,
+        title,
+        priority,
+        localDate: DATE,
+        baseXp: 20,
+        difficulty: "normal",
+      });
+    }
+
+    const rows = await listTasksForDate(db, userId, DATE);
+    expect(rows.map(({ task }) => task.title)).toEqual([
+      "Срочная",
+      "Обычная",
+      "Низкая",
     ]);
   });
 

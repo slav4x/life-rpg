@@ -25,4 +25,13 @@ describe("task template validation", () => {
         .success,
     ).toBe(false);
   });
+
+  it("accepts supported priorities and rejects unknown values", () => {
+    expect(
+      createTemplateInputSchema.safeParse({ ...input, priority: "high" }).success,
+    ).toBe(true);
+    expect(
+      createTemplateInputSchema.safeParse({ ...input, priority: "urgent" }).success,
+    ).toBe(false);
+  });
 });

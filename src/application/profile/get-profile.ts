@@ -35,6 +35,7 @@ export interface ProfileTemplate {
   skillId: string;
   baseXp: number;
   difficulty: string;
+  priority: string;
   description: string | null;
   recurrenceType: string;
   weekdays: number[] | null;
@@ -101,6 +102,7 @@ export async function getProfileData(
         skillId: template.skillId,
         baseXp: template.baseXp,
         difficulty: template.difficulty,
+        priority: template.priority,
         description: template.description,
         recurrenceType: template.recurrenceType,
         weekdays: template.weekdays,

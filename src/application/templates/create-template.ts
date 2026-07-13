@@ -5,7 +5,7 @@ import { isUniqueConstraintViolation } from "@/db/errors";
 import { getSkillById } from "@/db/repositories/skills";
 import { createTemplate } from "@/db/repositories/task-templates";
 import type { TaskTemplate } from "@/db/schema";
-import { isDifficulty } from "@/domain/game/constants";
+import { isDifficulty, isTaskPriority } from "@/domain/game/constants";
 import { isRecurrenceType } from "@/domain/game/recurrence";
 
 export interface CreateTemplateCommand {
@@ -15,6 +15,7 @@ export interface CreateTemplateCommand {
   description?: string;
   baseXp: number;
   difficulty: string;
+  priority?: string;
   recurrenceType: string;
   weekdays?: number[];
   estimatedMinutes?: number;
@@ -33,6 +34,9 @@ export async function createUserTemplate(
   }
   if (!isRecurrenceType(cmd.recurrenceType)) {
     throw new GameError("invalid_input", "Unknown recurrence");
+  }
+  if (cmd.priority && !isTaskPriority(cmd.priority)) {
+    throw new GameError("invalid_input", "Unknown priority");
   }
   if (
     cmd.recurrenceType === "weekdays" &&
@@ -58,6 +62,7 @@ export async function createUserTemplate(
       description: cmd.description ?? null,
       baseXp: cmd.baseXp,
       difficulty: cmd.difficulty,
+      priority: cmd.priority ?? "normal",
       recurrenceType: cmd.recurrenceType,
       weekdays: cmd.recurrenceType === "weekdays" ? (cmd.weekdays ?? null) : null,
       estimatedMinutes: cmd.estimatedMinutes ?? null,

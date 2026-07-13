@@ -14,6 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   getApiErrorMessage,
   NETWORK_ERROR_MESSAGE,
 } from "@/lib/http/client-error";
@@ -120,10 +127,25 @@ export function ProfileSettings({
   } | null>(null);
   const [pendingContentPack, setPendingContentPack] =
     useState<PendingContentPack | null>(null);
+  const [templateQuery, setTemplateQuery] = useState("");
+  const [templateSkill, setTemplateSkill] = useState("all");
 
   const timezoneOptions = TIMEZONES.includes(tz) ? TIMEZONES : [tz, ...TIMEZONES];
-  const active = templates.filter((t) => !t.archived);
-  const archived = templates.filter((t) => t.archived);
+  const normalizedTemplateQuery = templateQuery.trim().toLocaleLowerCase("ru-RU");
+  const templateSkillOptions = templates
+    .map((template) => ({ id: template.skillId, name: template.skillName }))
+    .filter(
+      (option, index, options) =>
+        options.findIndex((item) => item.id === option.id) === index,
+    );
+  const matchesTemplate = (template: ProfileTemplate) =>
+    (templateSkill === "all" || template.skillId === templateSkill) &&
+    `${template.title} ${template.skillName}`
+      .toLocaleLowerCase("ru-RU")
+      .includes(normalizedTemplateQuery);
+  const active = templates.filter((t) => !t.archived && matchesTemplate(t));
+  const archived = templates.filter((t) => t.archived && matchesTemplate(t));
+  const hasTemplates = templates.length > 0;
 
   async function changeTheme(next: string) {
     const previous = theme ?? "system";
@@ -501,8 +523,36 @@ export function ProfileSettings({
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium">Шаблоны задач</h2>
+        {hasTemplates && (
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <Input
+              type="search"
+              aria-label="Поиск шаблонов"
+              placeholder="Поиск шаблонов"
+              value={templateQuery}
+              onChange={(event) => setTemplateQuery(event.target.value)}
+            />
+            <Select value={templateSkill} onValueChange={setTemplateSkill}>
+              <SelectTrigger aria-label="Фильтр шаблонов по навыку" className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Все навыки</SelectItem>
+                {templateSkillOptions.map((skill) => (
+                  <SelectItem key={skill.id} value={skill.id}>
+                    {skill.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         {active.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Активных шаблонов нет.</p>
+          <p className="text-sm text-muted-foreground">
+            {hasTemplates && (templateQuery.trim() || templateSkill !== "all")
+              ? "Активных шаблонов по вашему запросу нет."
+              : "Активных шаблонов нет."}
+          </p>
         ) : (
           <ul className="flex flex-col gap-2">
             {active.map((t) => (

@@ -19,6 +19,7 @@ const attributeCode = z.enum([
   "creation",
 ]);
 const difficulty = z.enum(["easy", "normal", "hard", "epic"]);
+const priority = z.enum(["high", "normal", "low"]);
 const recurrenceType = z.enum(["daily", "weekdays"]);
 const questType = z.enum(["main", "side", "long_term"]);
 
@@ -44,6 +45,7 @@ const templateRow = z.object({
   description: z.string().max(2000).nullable(),
   baseXp: z.number().int(),
   difficulty: z.string(),
+  priority: priority.default("normal"),
   recurrenceType: z.string(),
   weekdays: z.array(z.number().int()).nullable(),
   estimatedMinutes: z.number().int().min(1).max(1440).nullable().default(null),
@@ -66,6 +68,7 @@ const taskRow = z.object({
   localDate: isoDateSchema,
   baseXp: z.number().int(),
   difficulty: z.string(),
+  priority: priority.default("normal"),
   status: z.string(),
   estimatedMinutes: z.number().int().nullable(),
   createdAt: timestamp,
@@ -201,6 +204,7 @@ const packTemplateFields = {
   skillKey: z.string().min(1).max(80),
   baseXp: z.number().int().min(5).max(250),
   difficulty,
+  priority: priority.optional(),
   recurrenceType,
   weekdays: z.array(z.number().int().min(1).max(7)).min(1).max(7).optional(),
   estimatedMinutes: z.number().int().min(1).max(1440).optional(),
@@ -238,6 +242,7 @@ const packTask = z
     skillKey: z.string().min(1).max(80),
     baseXp: z.number().int().min(5).max(250),
     difficulty,
+    priority: priority.optional(),
     estimatedMinutes: z.number().int().min(1).max(1440).optional(),
     scheduledInDays: z.number().int().min(0).max(3650).optional(),
   })

@@ -2,6 +2,9 @@ import { getDb, type DbClient } from "@/db/client";
 import {
   attributeDistribution,
   countCompletionsFrom,
+  templateCompletionCounts,
+  weeklyQuestSummary,
+  weeklyTaskSummary,
   xpByLocalDate,
   type AttributeXp,
   type DailyXp,
@@ -10,7 +13,11 @@ import { listStreaks } from "@/db/repositories/streaks";
 import { listTemplates } from "@/db/repositories/task-templates";
 import { listRecentXpEvents, type XpEvent } from "@/db/repositories/xp";
 import { displayCurrentStreak } from "@/domain/game/streak";
-import { addDaysToDate, getLocalDate } from "@/lib/dates/local-date";
+import {
+  addDaysToDate,
+  getIsoWeekday,
+  getLocalDate,
+} from "@/lib/dates/local-date";
 
 export type ProgressPeriod = "7d" | "30d" | "all";
 
@@ -30,6 +37,23 @@ export interface ProgressData {
   daily: DailyXp[];
   attributes: AttributeXp[];
   recent: XpEvent[];
+  templateStreaks: Array<{
+    templateId: string;
+    title: string;
+    current: number;
+    best: number;
+    weeklyCompletions: number;
+  }>;
+  week: {
+    from: string;
+    to: string;
+    xp: number;
+    completedTasks: number;
+    missedTasks: number;
+    completedQuests: number;
+    overdueQuests: Array<{ id: string; title: string; dueDate: string }>;
+    directions: AttributeXp[];
+  };
 }
 
 function laterDate(a: string, b: string): string {
@@ -60,8 +84,21 @@ export async function getProgressData(
       : period === "30d"
         ? addDaysToDate(today, -29)
         : undefined;
+  const weekStart = addDaysToDate(today, 1 - getIsoWeekday(today));
 
-  const [dailyRaw, completedTasks, attributes, recent, streaks, templates] =
+  const [
+    dailyRaw,
+    completedTasks,
+    attributes,
+    recent,
+    streaks,
+    templates,
+    weeklyXpRaw,
+    weeklyTasks,
+    weeklyQuests,
+    weeklyAttributes,
+    weeklyTemplateCounts,
+  ] =
     await Promise.all([
       xpByLocalDate(db, userId, timezone, from, today),
       countCompletionsFrom(db, userId, from, today),
@@ -69,6 +106,11 @@ export async function getProgressData(
       listRecentXpEvents(db, userId, 15),
       listStreaks(db, userId),
       listTemplates(db, userId),
+      xpByLocalDate(db, userId, timezone, weekStart, today),
+      weeklyTaskSummary(db, userId, weekStart, today),
+      weeklyQuestSummary(db, userId, timezone, weekStart, today),
+      attributeDistribution(db, userId, weekStart, today),
+      templateCompletionCounts(db, userId, weekStart, today),
     ]);
 
   // Totals reflect the full selected period; the chart is bounded to a window.
@@ -87,17 +129,41 @@ export async function getProgressData(
   );
   let currentStreak = 0;
   let bestStreak = 0;
+  const templateById = new Map(templates.map((template) => [template.id, template]));
+  const weeklyCountByTemplate = new Map(
+    weeklyTemplateCounts.map((item) => [item.templateId, item.count]),
+  );
+  const templateStreaks: ProgressData["templateStreaks"] = [];
   for (const s of streaks) {
     const rule = ruleByTemplate.get(s.templateId) ?? {
       recurrenceType: "daily",
       weekdays: null,
     };
-    currentStreak = Math.max(
-      currentStreak,
-      displayCurrentStreak(s.currentCount, rule, s.lastCompletedDate, today),
+    const current = displayCurrentStreak(
+      s.currentCount,
+      rule,
+      s.lastCompletedDate,
+      today,
     );
+    currentStreak = Math.max(currentStreak, current);
     bestStreak = Math.max(bestStreak, s.bestCount);
+    const template = templateById.get(s.templateId);
+    if (template) {
+      templateStreaks.push({
+        templateId: s.templateId,
+        title: template.title,
+        current,
+        best: s.bestCount,
+        weeklyCompletions: weeklyCountByTemplate.get(s.templateId) ?? 0,
+      });
+    }
   }
+  templateStreaks.sort(
+    (left, right) =>
+      right.current - left.current ||
+      right.best - left.best ||
+      left.title.localeCompare(right.title, "ru"),
+  );
 
   return {
     period,
@@ -107,5 +173,19 @@ export async function getProgressData(
     daily,
     attributes,
     recent,
+    templateStreaks,
+    week: {
+      from: weekStart,
+      to: today,
+      xp: weeklyXpRaw.reduce((sum, day) => sum + day.xp, 0),
+      completedTasks: weeklyTasks.completed,
+      missedTasks: weeklyTasks.missed,
+      completedQuests: weeklyQuests.completed,
+      overdueQuests: weeklyQuests.overdue,
+      directions: weeklyAttributes
+        .filter((attribute) => attribute.xp > 0)
+        .sort((left, right) => right.xp - left.xp)
+        .slice(0, 3),
+    },
   };
 }

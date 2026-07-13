@@ -33,6 +33,13 @@ function eventDate(localDate: string | null, createdAt: string): string {
   }).format(date);
 }
 
+function shortDate(value: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "short",
+  }).format(new Date(`${value}T00:00:00`));
+}
+
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="flex flex-col rounded-xl border bg-card px-3 py-2.5">
@@ -74,6 +81,85 @@ export function ProgressScreen({ data }: { data: ProgressData }) {
           value={`${data.streak.current}/${data.streak.best}`}
         />
       </div>
+
+      <section className="flex flex-col gap-3 rounded-2xl border bg-card p-3">
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="text-sm font-medium">Эта неделя</h2>
+          <span className="text-xs text-muted-foreground">
+            {shortDate(data.week.from)} — {shortDate(data.week.to)}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Stat label="XP" value={data.week.xp} />
+          <Stat label="Выполнено" value={data.week.completedTasks} />
+          <Stat label="Пропущено" value={data.week.missedTasks} />
+          <Stat label="Квестов завершено" value={data.week.completedQuests} />
+        </div>
+        {data.week.directions.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 text-xs">
+            <span className="w-full text-muted-foreground">
+              Основные направления
+            </span>
+            {data.week.directions.map((direction) => (
+              <span key={direction.code} className="rounded-full bg-muted px-2 py-1">
+                {direction.name} · {direction.xp} XP
+              </span>
+            ))}
+          </div>
+        )}
+        {data.week.overdueQuests.length > 0 && (
+          <div className="flex flex-col gap-1.5 text-xs">
+            <span className="text-muted-foreground">
+              Требуют внимания: просроченные квесты
+            </span>
+            {data.week.overdueQuests.map((quest) => (
+              <Link
+                key={quest.id}
+                href={`/quests/${quest.id}`}
+                className="flex min-h-9 items-center justify-between rounded-lg border px-2.5"
+              >
+                <span className="truncate">{quest.title}</span>
+                <span className="shrink-0 text-destructive">
+                  {shortDate(quest.dueDate)}
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-medium">Серии по повторениям</h2>
+        {data.templateStreaks.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Завершите первое повторяющееся действие, чтобы начать серию.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {data.templateStreaks.map((streak) => (
+              <div
+                key={streak.templateId}
+                className="flex items-center justify-between gap-3 rounded-xl border bg-card px-3 py-2.5"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium">
+                    {streak.title}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    За неделю: {streak.weeklyCompletions} выполнений
+                  </span>
+                </span>
+                <span className="shrink-0 text-right text-sm font-medium">
+                  {streak.current} / {streak.best}
+                  <span className="block text-[11px] font-normal text-muted-foreground">
+                    сейчас / рекорд
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium">XP по дням</h2>

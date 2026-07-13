@@ -22,6 +22,7 @@ export interface AttributeGroup {
 }
 
 export interface ArchivedSkillOverviewItem extends SkillOverviewItem {
+  attributeCode: string;
   attributeName: string;
 }
 
@@ -73,6 +74,8 @@ export async function getArchivedSkillsOverview(
     color: skill.color,
     xp,
     level: levelProgress(xp),
+    attributeCode:
+      attributes.find((attribute) => attribute.id === skill.attributeId)?.code ?? "",
     attributeName: attributeNames.get(skill.attributeId) ?? "Без характеристики",
   }));
 }

@@ -33,6 +33,8 @@ import type { SkillOption, TaskVM } from "./types";
 const difficultyLabel = (value: string) =>
   DIFFICULTIES.find((d) => d.value === value)?.label ?? value;
 
+const priorityLabel = { high: "Высокий", low: "Низкий" } as const;
+
 export function TaskItem({
   task,
   date,
@@ -134,6 +136,11 @@ export function TaskItem({
             {task.skillName}
           </Badge>
           <span>+{task.finalXp} XP</span>
+          {task.priority !== "normal" && (
+            <Badge variant={task.priority === "high" ? "default" : "outline"}>
+              {priorityLabel[task.priority]}
+            </Badge>
+          )}
           <span>·</span>
           <span>{difficultyLabel(task.difficulty)}</span>
           {task.estimatedMinutes != null && (
@@ -194,6 +201,7 @@ export function TaskItem({
               description: task.description,
               skillId: task.skillId,
               difficulty: task.difficulty,
+              priority: task.priority,
               baseXp: task.baseXp,
               localDate: date,
               estimatedMinutes: task.estimatedMinutes,

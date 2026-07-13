@@ -632,6 +632,7 @@ async function analyzeContentPack(
         nullable(existing.description) === nullable(task.description) &&
         existing.baseXp === task.baseXp &&
         existing.difficulty === task.difficulty &&
+        existing.priority === (task.priority ?? "normal") &&
         existing.estimatedMinutes === (task.estimatedMinutes ?? null)
       ) {
         skippedTasks += 1;
@@ -684,6 +685,7 @@ async function analyzeContentPack(
         nullable(existing.description) === nullable(template.description) &&
         existing.baseXp === template.baseXp &&
         existing.difficulty === template.difficulty &&
+        existing.priority === (template.priority ?? "normal") &&
         existing.recurrenceType === template.recurrenceType &&
         sameArray(existing.weekdays, template.weekdays) &&
         existing.estimatedMinutes === (template.estimatedMinutes ?? null) &&
@@ -849,6 +851,7 @@ export async function importContentPack(
         localDate,
         baseXp: task.baseXp,
         difficulty: task.difficulty,
+        priority: task.priority ?? "normal",
         estimatedMinutes: task.estimatedMinutes ?? null,
       });
     }
@@ -860,6 +863,7 @@ export async function importContentPack(
         description: template.description ?? null,
         baseXp: template.baseXp,
         difficulty: template.difficulty,
+        priority: template.priority ?? "normal",
         recurrenceType: template.recurrenceType,
         weekdays: template.recurrenceType === "weekdays" ? template.weekdays : null,
         estimatedMinutes: template.estimatedMinutes ?? null,

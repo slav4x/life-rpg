@@ -17,6 +17,7 @@ export interface CreateTaskInput {
   localDate: string;
   baseXp: number;
   difficulty: string;
+  priority?: string;
   estimatedMinutes?: number | null;
   questStepId?: string | null;
 }
@@ -35,6 +36,7 @@ export async function createTask(
       localDate: input.localDate,
       baseXp: input.baseXp,
       difficulty: input.difficulty,
+      priority: input.priority ?? "normal",
       estimatedMinutes: input.estimatedMinutes ?? null,
       questStepId: input.questStepId ?? null,
     })
@@ -51,6 +53,7 @@ export interface TemplateTaskRow {
   localDate: string;
   baseXp: number;
   difficulty: string;
+  priority: string;
   estimatedMinutes: number | null;
 }
 
@@ -71,7 +74,7 @@ export interface TaskWithSkill {
   skill: Skill;
 }
 
-/** Tasks for a given local day, newest first, joined with their skill. */
+/** Tasks for a given local day, ordered by state and explicit priority. */
 export async function listTasksForDate(
   db: DbClient,
   userId: string,
@@ -88,7 +91,11 @@ export async function listTasksForDate(
         ne(tasks.status, "cancelled"),
       ),
     )
-    .orderBy(asc(tasks.status), desc(tasks.createdAt));
+    .orderBy(
+      asc(tasks.status),
+      sql`case ${tasks.priority} when 'high' then 0 when 'normal' then 1 else 2 end`,
+      desc(tasks.createdAt),
+    );
 }
 
 export async function listRecentTasksBySkill(
@@ -194,6 +201,7 @@ export interface UpdateTaskFields {
   localDate?: string;
   baseXp?: number;
   difficulty?: string;
+  priority?: string;
   estimatedMinutes?: number | null;
 }
 

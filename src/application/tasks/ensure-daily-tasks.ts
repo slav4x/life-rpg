@@ -39,6 +39,7 @@ export async function ensureTasksForDate(
       localDate,
       baseXp: t.baseXp,
       difficulty: t.difficulty,
+      priority: t.priority,
       estimatedMinutes: t.estimatedMinutes,
     })),
   );

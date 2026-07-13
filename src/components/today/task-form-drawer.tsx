@@ -31,6 +31,7 @@ import {
   BASE_XP,
   DIFFICULTIES,
   isDifficulty,
+  TASK_PRIORITIES,
 } from "@/domain/game/constants";
 import {
   getApiErrorMessage,
@@ -48,6 +49,7 @@ export interface TaskEditVM {
   description: string | null;
   skillId: string;
   difficulty: string;
+  priority: string;
   baseXp: number;
   localDate: string;
   estimatedMinutes: number | null;
@@ -94,6 +96,7 @@ export function TaskFormDrawer({
     task?.skillId ?? preset?.skillId ?? skills[0]?.id ?? "",
   );
   const [difficulty, setDifficulty] = useState(task?.difficulty ?? "normal");
+  const [priority, setPriority] = useState(task?.priority ?? "normal");
   const [baseXp, setBaseXp] = useState(String(task?.baseXp ?? BASE_XP.default));
   const [minutes, setMinutes] = useState(
     task?.estimatedMinutes ? String(task.estimatedMinutes) : "",
@@ -146,6 +149,7 @@ export function TaskFormDrawer({
             title: trimmed,
             skillId,
             difficulty,
+            priority,
             baseXp: xpNumber,
             localDate,
             description: description.trim() || null,
@@ -166,6 +170,7 @@ export function TaskFormDrawer({
             title: trimmed,
             skillId,
             difficulty,
+            priority,
             baseXp: xpNumber,
             recurrenceType: recurrence,
             weekdays: recurrence === "weekdays" ? weekdays : undefined,
@@ -183,6 +188,7 @@ export function TaskFormDrawer({
             title: trimmed,
             skillId,
             difficulty,
+            priority,
             baseXp: xpNumber,
             localDate,
             description: description.trim() || undefined,
@@ -272,7 +278,7 @@ export function TaskFormDrawer({
             <div className="flex flex-col gap-1.5">
               <Label>Навык</Label>
               <Select value={skillId} onValueChange={setSkillId}>
-                <SelectTrigger>
+                <SelectTrigger aria-label="Навык">
                   <SelectValue placeholder="Выберите навык" />
                 </SelectTrigger>
                 <SelectContent>
@@ -313,6 +319,21 @@ export function TaskFormDrawer({
                   onChange={(e) => setBaseXp(e.target.value)}
                 />
               </div>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Приоритет</Label>
+              <Select value={priority} onValueChange={setPriority}>
+                <SelectTrigger aria-label="Приоритет">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TASK_PRIORITIES.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <p className="-mt-2 text-xs text-muted-foreground">
               ≈ {previewXp} XP за выполнение · рекомендуется {BASE_XP.min}–{BASE_XP.max}.

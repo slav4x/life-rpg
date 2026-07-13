@@ -102,6 +102,32 @@ test("creates a one-off action", async ({ page }) => {
   await expect(page.getByText(/^Действие ·/).first()).toBeVisible();
 });
 
+test("sets task priority and filters long lists", async ({ page }) => {
+  const title = `E2E приоритет ${Date.now()}`;
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Привет/ })).toBeVisible({
+    timeout: 15000,
+  });
+  await page.getByRole("button", { name: "Добавить" }).click();
+  const dialog = page.getByRole("dialog", { name: "Новое действие" });
+  await dialog.getByLabel("Название").fill(title);
+  await dialog.getByLabel("Приоритет").click();
+  await page.getByRole("option", { name: "Высокий" }).click();
+  await dialog.getByRole("button", { name: "Добавить", exact: true }).click();
+  await expect(
+    page.getByRole("listitem").filter({ hasText: title }).getByText("Высокий"),
+  ).toBeVisible();
+
+  await page.getByRole("link", { name: "Навыки" }).click();
+  await page.getByLabel("Поиск навыков").fill("нет-такого-навыка-e2e");
+  await expect(page.getByText("По вашему запросу ничего не найдено.")).toBeVisible();
+
+  await page.getByRole("link", { name: "Квесты" }).click();
+  await page.getByLabel("Поиск квестов").fill("нет-такого-квеста-e2e");
+  await expect(page.getByText("Нет активных квестов этого типа.")).toBeVisible();
+});
+
 test("creates and customizes a skill before earning XP", async ({ page }) => {
   const title = `E2E навык ${Date.now()}`;
 

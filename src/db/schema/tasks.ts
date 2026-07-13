@@ -40,6 +40,7 @@ export const tasks = pgTable(
     localDate: date("local_date", { mode: "string" }).notNull(),
     baseXp: integer("base_xp").notNull(),
     difficulty: text("difficulty").notNull(),
+    priority: text("priority").notNull().default("normal"),
     status: text("status").notNull().default("pending"),
     estimatedMinutes: integer("estimated_minutes"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -58,6 +59,10 @@ export const tasks = pgTable(
     check(
       "tasks_status_check",
       sql`${table.status} in ('pending', 'completed', 'cancelled')`,
+    ),
+    check(
+      "tasks_priority_check",
+      sql`${table.priority} in ('high', 'normal', 'low')`,
     ),
     check(
       "tasks_estimated_minutes_check",

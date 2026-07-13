@@ -11,7 +11,7 @@ import {
   type UpdateTaskFields,
 } from "@/db/repositories/tasks";
 import type { Task } from "@/db/schema";
-import { isDifficulty } from "@/domain/game/constants";
+import { isDifficulty, isTaskPriority } from "@/domain/game/constants";
 
 export interface EditTaskCommand {
   title?: string;
@@ -20,6 +20,7 @@ export interface EditTaskCommand {
   localDate?: string;
   baseXp?: number;
   difficulty?: string;
+  priority?: string;
   estimatedMinutes?: number | null;
   /** "future" also updates the source template for upcoming days (SPEC §6.3). */
   scope?: "this" | "future";
@@ -52,6 +53,9 @@ export async function editTask(
     if (cmd.difficulty && !isDifficulty(cmd.difficulty)) {
       throw new GameError("invalid_input", "Unknown difficulty");
     }
+    if (cmd.priority && !isTaskPriority(cmd.priority)) {
+      throw new GameError("invalid_input", "Unknown priority");
+    }
     await assertEditableSkill(tx, userId, cmd.skillId);
 
     const fields: UpdateTaskFields = {
@@ -61,6 +65,7 @@ export async function editTask(
       localDate: cmd.localDate,
       baseXp: cmd.baseXp,
       difficulty: cmd.difficulty,
+      priority: cmd.priority,
       estimatedMinutes: cmd.estimatedMinutes,
     };
 
@@ -71,6 +76,7 @@ export async function editTask(
         skillId: cmd.skillId,
         baseXp: cmd.baseXp,
         difficulty: cmd.difficulty,
+        priority: cmd.priority,
         estimatedMinutes: cmd.estimatedMinutes,
       };
       await updateTemplate(tx, userId, task.templateId, templateFields);

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { baseXpSchema, estimatedMinutesSchema, isoDateSchema } from "./common";
 
 const difficulty = z.enum(["easy", "normal", "hard", "epic"]);
+const priority = z.enum(["high", "normal", "low"]);
 const weekdays = z.array(z.number().int().min(1).max(7)).min(1).max(7);
 
 export const createTemplateInputSchema = z
@@ -12,6 +13,7 @@ export const createTemplateInputSchema = z
     skillId: z.uuid(),
     baseXp: baseXpSchema,
     difficulty,
+    priority: priority.optional(),
     recurrenceType: z.enum(["daily", "weekdays"]),
     weekdays: weekdays.optional(),
     estimatedMinutes: estimatedMinutesSchema.optional(),
@@ -34,6 +36,7 @@ export const updateTemplateInputSchema = z
     skillId: z.uuid().optional(),
     baseXp: baseXpSchema.optional(),
     difficulty: difficulty.optional(),
+    priority: priority.optional(),
     recurrenceType: z.enum(["daily", "weekdays"]).optional(),
     weekdays: weekdays.nullable().optional(),
     estimatedMinutes: estimatedMinutesSchema.nullable().optional(),

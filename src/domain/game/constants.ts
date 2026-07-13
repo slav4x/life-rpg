@@ -48,6 +48,18 @@ export function isDifficulty(value: string): value is Difficulty {
   return value in DIFFICULTY_MULTIPLIERS;
 }
 
+export type TaskPriority = "high" | "normal" | "low";
+
+export const TASK_PRIORITIES: { value: TaskPriority; label: string }[] = [
+  { value: "high", label: "Высокий" },
+  { value: "normal", label: "Обычный" },
+  { value: "low", label: "Низкий" },
+];
+
+export function isTaskPriority(value: string): value is TaskPriority {
+  return value === "high" || value === "normal" || value === "low";
+}
+
 /** Recommended base-XP range shown as a hint in the add-action form (SPEC §5.4). */
 export const BASE_XP = { min: 5, max: 250, default: 25 } as const;
 

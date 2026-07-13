@@ -26,6 +26,7 @@
       "skillKey": "reading",
       "baseXp": 20,
       "difficulty": "easy",
+      "priority": "high",
       "estimatedMinutes": 30,
       "scheduledInDays": 1
     }
@@ -37,6 +38,7 @@
       "skillKey": "reading",
       "baseXp": 20,
       "difficulty": "easy",
+      "priority": "normal",
       "recurrenceType": "weekdays",
       "weekdays": [1, 2, 3, 4, 5],
       "estimatedMinutes": 20,
@@ -67,6 +69,7 @@
 
 - `attributeCode`: `body`, `mind`, `resources`, `social`, `discipline`, `creation`;
 - `difficulty`: `easy`, `normal`, `hard`, `epic`;
+- `priority`: необязательный приоритет `high`, `normal` или `low`; по умолчанию `normal`;
 - `recurrenceType`: `daily` или `weekdays`; для `weekdays` обязательны дни `1–7`;
 - `type`: `main`, `side`, `long_term`;
 - `baseXp`: `5–250`, `rewardXp`: `0–10000`;

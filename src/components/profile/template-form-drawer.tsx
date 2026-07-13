@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { BASE_XP, DIFFICULTIES } from "@/domain/game/constants";
+import { BASE_XP, DIFFICULTIES, TASK_PRIORITIES } from "@/domain/game/constants";
 import {
   getApiErrorMessage,
   NETWORK_ERROR_MESSAGE,
@@ -47,6 +47,7 @@ export interface TemplateEditVM {
   skillId: string;
   baseXp: number;
   difficulty: string;
+  priority: string;
   description: string | null;
   recurrenceType: string;
   weekdays: number[] | null;
@@ -71,6 +72,7 @@ export function TemplateFormDrawer({
   const [title, setTitle] = useState(template.title);
   const [skillId, setSkillId] = useState(template.skillId);
   const [difficulty, setDifficulty] = useState(template.difficulty);
+  const [priority, setPriority] = useState(template.priority);
   const [baseXp, setBaseXp] = useState(String(template.baseXp));
   const [recurrence, setRecurrence] = useState(template.recurrenceType);
   const [weekdays, setWeekdays] = useState<number[]>(template.weekdays ?? []);
@@ -113,6 +115,7 @@ export function TemplateFormDrawer({
           title: trimmed,
           skillId,
           difficulty,
+          priority,
           baseXp: xp,
           recurrenceType: recurrence,
           weekdays: recurrence === "weekdays" ? weekdays : null,
@@ -161,7 +164,7 @@ export function TemplateFormDrawer({
             <div className="flex flex-col gap-1.5">
               <Label>Навык</Label>
               <Select value={skillId} onValueChange={setSkillId}>
-                <SelectTrigger>
+                <SelectTrigger aria-label="Навык">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -202,6 +205,22 @@ export function TemplateFormDrawer({
                   onChange={(e) => setBaseXp(e.target.value)}
                 />
               </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Приоритет задач</Label>
+              <Select value={priority} onValueChange={setPriority}>
+                <SelectTrigger aria-label="Приоритет задач">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TASK_PRIORITIES.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex flex-col gap-1.5">

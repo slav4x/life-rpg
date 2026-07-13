@@ -10,6 +10,7 @@ export interface CreateTemplateInput {
   description?: string | null;
   baseXp: number;
   difficulty: string;
+  priority?: string;
   recurrenceType: string;
   weekdays?: number[] | null;
   estimatedMinutes?: number | null;
@@ -30,6 +31,7 @@ export async function createTemplate(
       description: input.description ?? null,
       baseXp: input.baseXp,
       difficulty: input.difficulty,
+      priority: input.priority ?? "normal",
       recurrenceType: input.recurrenceType,
       weekdays: input.weekdays ?? null,
       estimatedMinutes: input.estimatedMinutes ?? null,
@@ -90,6 +92,7 @@ export interface UpdateTemplateFields {
   skillId?: string;
   baseXp?: number;
   difficulty?: string;
+  priority?: string;
   recurrenceType?: string;
   weekdays?: number[] | null;
   estimatedMinutes?: number | null;

@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -126,9 +127,17 @@ export function QuestsScreen({
   const urlType = requestedType && isQuestType(requestedType) ? requestedType : "all";
   const activeTab = urlTab;
   const typeFilter = urlType;
+  const [query, setQuery] = useState("");
+  const [attributeFilter, setAttributeFilter] = useState("all");
+  const normalizedQuery = query.trim().toLocaleLowerCase("ru-RU");
 
   const filtered = quests.filter(
-    (quest) => typeFilter === "all" || quest.type === typeFilter,
+    (quest) =>
+      (typeFilter === "all" || quest.type === typeFilter) &&
+      (attributeFilter === "all" || quest.attributeName === attributeFilter) &&
+      `${quest.title} ${quest.attributeName ?? ""}`
+        .toLocaleLowerCase("ru-RU")
+        .includes(normalizedQuery),
   );
   const active = filtered
     .filter((quest) => quest.status === "active" || quest.status === "draft")
@@ -158,15 +167,20 @@ export function QuestsScreen({
         <CreateQuestDrawer attributes={attributes} />
       </div>
 
-      <div className="flex items-center gap-3">
-        <Label htmlFor="quest-type-filter" className="shrink-0">
-          Тип
-        </Label>
+      <Input
+        type="search"
+        aria-label="Поиск квестов"
+        placeholder="Поиск квестов"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+      />
+
+      <div className="grid grid-cols-2 gap-2">
         <Select
           value={typeFilter}
           onValueChange={(value) => replaceQuery({ type: value })}
         >
-          <SelectTrigger id="quest-type-filter" className="flex-1">
+          <SelectTrigger id="quest-type-filter" aria-label="Фильтр по типу квеста">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -174,6 +188,19 @@ export function QuestsScreen({
             {QUEST_TYPES.map((questType) => (
               <SelectItem key={questType.value} value={questType.value}>
                 {questType.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={attributeFilter} onValueChange={setAttributeFilter}>
+          <SelectTrigger aria-label="Фильтр квестов по характеристике">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Все направления</SelectItem>
+            {attributes.map((attribute) => (
+              <SelectItem key={attribute.id} value={attribute.name}>
+                {attribute.name}
               </SelectItem>
             ))}
           </SelectContent>

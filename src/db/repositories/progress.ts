@@ -1,10 +1,22 @@
-import { and, asc, eq, gte, isNull, lte, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  gte,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  sql,
+} from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
 import {
   attributes,
   questCompletions,
   taskCompletions,
+  tasks,
+  quests,
   xpTransactions,
 } from "@/db/schema";
 
@@ -79,6 +91,113 @@ export async function countCompletionsFrom(
     .from(taskCompletions)
     .where(and(...conditions));
   return Number(row?.count ?? 0);
+}
+
+export interface WeeklyTaskSummary {
+  completed: number;
+  missed: number;
+}
+
+/** Completed tasks and still-pending past tasks in the current local week. */
+export async function weeklyTaskSummary(
+  db: DbClient,
+  userId: string,
+  fromDate: string,
+  today: string,
+): Promise<WeeklyTaskSummary> {
+  const [row] = await db
+    .select({
+      completed: sql<string>`count(*) filter (where ${tasks.status} = 'completed')`,
+      missed: sql<string>`count(*) filter (where ${tasks.status} = 'pending' and ${tasks.localDate} < ${today})`,
+    })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.userId, userId),
+        gte(tasks.localDate, fromDate),
+        lte(tasks.localDate, today),
+      ),
+    );
+  return {
+    completed: Number(row?.completed ?? 0),
+    missed: Number(row?.missed ?? 0),
+  };
+}
+
+export interface WeeklyQuestSummary {
+  completed: number;
+  overdue: Array<{ id: string; title: string; dueDate: string }>;
+}
+
+export async function weeklyQuestSummary(
+  db: DbClient,
+  userId: string,
+  timezone: string,
+  fromDate: string,
+  today: string,
+): Promise<WeeklyQuestSummary> {
+  const completionDate = sql<string>`(${questCompletions.completedAt} at time zone ${timezone})::date`;
+  const [[completedRow], overdueRows] = await Promise.all([
+    db
+      .select({ count: sql<string>`count(*)` })
+      .from(questCompletions)
+      .where(
+        and(
+          eq(questCompletions.userId, userId),
+          isNull(questCompletions.revertedAt),
+          gte(completionDate, fromDate),
+          lte(completionDate, today),
+        ),
+      ),
+    db
+      .select({ id: quests.id, title: quests.title, dueDate: quests.dueDate })
+      .from(quests)
+      .where(
+        and(
+          eq(quests.userId, userId),
+          eq(quests.status, "active"),
+          isNotNull(quests.dueDate),
+          lt(quests.dueDate, today),
+        ),
+      )
+      .orderBy(asc(quests.dueDate)),
+  ]);
+  return {
+    completed: Number(completedRow?.count ?? 0),
+    overdue: overdueRows.flatMap((quest) =>
+      quest.dueDate ? [{ ...quest, dueDate: quest.dueDate }] : [],
+    ),
+  };
+}
+
+export async function templateCompletionCounts(
+  db: DbClient,
+  userId: string,
+  fromDate: string,
+  toDate: string,
+): Promise<Array<{ templateId: string; count: number }>> {
+  const rows = await db
+    .select({
+      templateId: tasks.templateId,
+      count: sql<string>`count(*)`,
+    })
+    .from(taskCompletions)
+    .innerJoin(tasks, eq(tasks.id, taskCompletions.taskId))
+    .where(
+      and(
+        eq(taskCompletions.userId, userId),
+        isNull(taskCompletions.revertedAt),
+        isNotNull(tasks.templateId),
+        gte(taskCompletions.localDate, fromDate),
+        lte(taskCompletions.localDate, toDate),
+      ),
+    )
+    .groupBy(tasks.templateId);
+  return rows.flatMap((row) =>
+    row.templateId
+      ? [{ templateId: row.templateId, count: Number(row.count) }]
+      : [],
+  );
 }
 
 export interface AttributeXp {

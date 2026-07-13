@@ -14,6 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   getApiErrorMessage,
   NETWORK_ERROR_MESSAGE,
 } from "@/lib/http/client-error";
@@ -35,6 +42,34 @@ export function SkillsScreen({
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rename, setRename] = useState<{ id: string; value: string } | null>(null);
+  const [query, setQuery] = useState("");
+  const [attribute, setAttribute] = useState("all");
+  const attributeOptions = [
+    ...groups.map((group) => ({ code: group.code, name: group.name })),
+    ...archived.map((skill) => ({
+      code: skill.attributeCode,
+      name: skill.attributeName,
+    })),
+  ].filter(
+    (option, index, options) =>
+      option.code && options.findIndex((item) => item.code === option.code) === index,
+  );
+
+  const normalizedQuery = query.trim().toLocaleLowerCase("ru-RU");
+  const filteredGroups = groups
+    .filter((group) => attribute === "all" || group.code === attribute)
+    .map((group) => ({
+      ...group,
+      skills: group.skills.filter((skill) =>
+        skill.name.toLocaleLowerCase("ru-RU").includes(normalizedQuery),
+      ),
+    }))
+    .filter((group) => group.skills.length > 0);
+  const filteredArchived = archived.filter(
+    (skill) =>
+      (attribute === "all" || skill.attributeCode === attribute) &&
+      skill.name.toLocaleLowerCase("ru-RU").includes(normalizedQuery),
+  );
 
   async function restore(skill: ArchivedSkillOverviewItem, name?: string) {
     setBusyId(skill.id);
@@ -85,12 +120,37 @@ export function SkillsScreen({
         <SkillFormDrawer />
       </div>
 
-      {groups.length === 0 ? (
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+        <Input
+          type="search"
+          aria-label="Поиск навыков"
+          placeholder="Поиск навыков"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        <Select value={attribute} onValueChange={setAttribute}>
+          <SelectTrigger aria-label="Фильтр по характеристике" className="w-36">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Все</SelectItem>
+            {attributeOptions.map((option) => (
+              <SelectItem key={option.code} value={option.code}>
+                {option.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {filteredGroups.length === 0 ? (
         <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-          Навыков пока нет. Создайте первый.
+          {groups.length === 0
+            ? "Навыков пока нет. Создайте первый."
+            : "По вашему запросу ничего не найдено."}
         </div>
       ) : (
-        groups.map((group) => (
+        filteredGroups.map((group) => (
           <section key={group.code} className="flex flex-col gap-2">
             <h2 className="text-sm font-medium text-muted-foreground">
               {group.name}
@@ -132,13 +192,13 @@ export function SkillsScreen({
         ))
       )}
 
-      {archived.length > 0 && (
+      {filteredArchived.length > 0 && (
         <details className="rounded-xl border px-3">
           <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium">
-            Архив ({archived.length})
+            Архив ({filteredArchived.length})
           </summary>
           <div className="flex flex-col gap-2 pb-3">
-            {archived.map((skill) => (
+            {filteredArchived.map((skill) => (
               <div
                 key={skill.id}
                 data-archived-skill

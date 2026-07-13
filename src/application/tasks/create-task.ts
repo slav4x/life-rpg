@@ -18,6 +18,7 @@ export interface CreateTaskCommand {
   localDate: string;
   baseXp: number;
   difficulty: string;
+  priority?: string;
   estimatedMinutes?: number;
   questStepId?: string;
 }
@@ -60,6 +61,7 @@ export async function createOneOffTask(
       localDate: cmd.localDate,
       baseXp: cmd.baseXp,
       difficulty: cmd.difficulty,
+      priority: cmd.priority ?? "normal",
       estimatedMinutes: cmd.estimatedMinutes ?? null,
       questStepId: cmd.questStepId ?? null,
     });

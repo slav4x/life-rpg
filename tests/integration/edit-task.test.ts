@@ -114,7 +114,7 @@ describe.skipIf(!url)("edit & cancel task (integration)", () => {
     await editTask(
       userId,
       materialised[0].id,
-      { baseXp: 55, estimatedMinutes: 25, scope: "future" },
+      { baseXp: 55, estimatedMinutes: 25, priority: "high", scope: "future" },
       db,
     );
 
@@ -124,6 +124,7 @@ describe.skipIf(!url)("edit & cancel task (integration)", () => {
       .where(eq(taskTemplates.id, template.id));
     expect(t.baseXp).toBe(55);
     expect(t.estimatedMinutes).toBe(25);
+    expect(t.priority).toBe("high");
     const updatedTasks = await db
       .select()
       .from(tasks)
@@ -135,6 +136,12 @@ describe.skipIf(!url)("edit & cancel task (integration)", () => {
       25,
       null,
       null,
+    ]);
+    expect(updatedTasks.map((row) => row.priority)).toEqual([
+      "high",
+      "high",
+      "normal",
+      "normal",
     ]);
   });
 
