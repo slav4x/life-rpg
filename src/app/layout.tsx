@@ -24,8 +24,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   // Cover the notch/safe areas so the Mini App fills the Telegram viewport.
   viewportFit: "cover",
   themeColor: [

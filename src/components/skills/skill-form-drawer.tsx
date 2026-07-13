@@ -31,6 +31,10 @@ import {
   SKILL_COLORS,
   SKILL_ICONS,
 } from "@/domain/game/constants";
+import {
+  getApiErrorMessage,
+  NETWORK_ERROR_MESSAGE,
+} from "@/lib/http/client-error";
 import { cn } from "@/lib/utils";
 
 interface EditableSkill {
@@ -87,14 +91,14 @@ export function SkillFormDrawer({
         },
       );
       if (!res.ok) {
-        toast.error("Не удалось сохранить навык");
+        toast.error(await getApiErrorMessage(res, "Не удалось сохранить навык."));
         return;
       }
       toast.success(isEdit ? "Навык обновлён" : "Навык создан");
       setOpen(false);
       router.refresh();
     } catch {
-      toast.error("Ошибка сети");
+      toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
       setSubmitting(false);
     }
@@ -163,7 +167,7 @@ export function SkillFormDrawer({
 
             <div className="flex flex-col gap-1.5">
               <Label>Иконка</Label>
-              <div className="grid grid-cols-8 gap-1.5">
+              <div className="grid grid-cols-4 gap-2">
                 {SKILL_ICONS.map((option) => (
                   <button
                     key={option}
@@ -172,7 +176,7 @@ export function SkillFormDrawer({
                     aria-pressed={icon === option}
                     onClick={() => setIcon(option)}
                     className={cn(
-                      "flex aspect-square items-center justify-center rounded-lg border text-lg transition-colors",
+                      "flex size-11 items-center justify-center justify-self-center rounded-lg border text-lg transition-colors motion-reduce:transition-none",
                       icon === option
                         ? "border-primary bg-primary/10"
                         : "bg-background",
@@ -186,7 +190,7 @@ export function SkillFormDrawer({
 
             <div className="flex flex-col gap-1.5">
               <Label>Цвет</Label>
-              <div className="grid grid-cols-8 gap-1.5">
+              <div className="grid grid-cols-4 gap-2">
                 {SKILL_COLORS.map((option, index) => (
                   <button
                     key={option}
@@ -195,7 +199,7 @@ export function SkillFormDrawer({
                     aria-pressed={color === option}
                     onClick={() => setColor(option)}
                     className={cn(
-                      "aspect-square rounded-full border-2 transition-transform",
+                      "size-11 justify-self-center rounded-full border-2 transition-transform motion-reduce:transition-none",
                       color === option
                         ? "scale-90 border-foreground"
                         : "border-transparent",

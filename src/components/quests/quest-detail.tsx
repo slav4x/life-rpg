@@ -1,7 +1,6 @@
 "use client";
 
 import { Archive, ArrowLeft, CalendarPlus, RotateCcw } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -27,6 +26,10 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { QUEST_TYPES } from "@/domain/game/quest";
+import {
+  getApiErrorMessage,
+  NETWORK_ERROR_MESSAGE,
+} from "@/lib/http/client-error";
 import { cn } from "@/lib/utils";
 
 import { QuestFormDrawer } from "./create-quest-drawer";
@@ -70,6 +73,14 @@ export function QuestDetail({
     ? skills.find((skill) => skill.attributeId === quest.attributeId)
     : undefined;
 
+  function goBack() {
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push("/quests");
+  }
+
   async function toggle(stepId: string) {
     setBusy(true);
     try {
@@ -77,7 +88,7 @@ export function QuestDetail({
         method: "POST",
       });
       if (!res.ok) {
-        toast.error("Не удалось обновить шаг");
+        toast.error(await getApiErrorMessage(res, "Не удалось обновить шаг."));
         return;
       }
       const data: ToggleStepResult = await res.json();
@@ -87,7 +98,7 @@ export function QuestDetail({
       }
       router.refresh();
     } catch {
-      toast.error("Ошибка сети");
+      toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
       setBusy(false);
     }
@@ -100,7 +111,7 @@ export function QuestDetail({
         method: "POST",
       });
       if (!res.ok) {
-        toast.error("Не удалось завершить квест");
+        toast.error(await getApiErrorMessage(res, "Не удалось завершить квест."));
         return;
       }
       const data: CompleteQuestResult = await res.json();
@@ -110,7 +121,7 @@ export function QuestDetail({
       showAchievementToasts(data.unlockedAchievements);
       router.refresh();
     } catch {
-      toast.error("Ошибка сети");
+      toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
       setBusy(false);
     }
@@ -125,13 +136,20 @@ export function QuestDetail({
         body: JSON.stringify({ status }),
       });
       if (!res.ok) {
-        toast.error(status === "archived" ? "Не удалось архивировать" : "Не удалось вернуть квест");
+        toast.error(
+          await getApiErrorMessage(
+            res,
+            status === "archived"
+              ? "Не удалось архивировать квест."
+              : "Не удалось вернуть квест.",
+          ),
+        );
         return;
       }
       toast.success(status === "archived" ? "Квест архивирован" : "Квест возвращён");
       router.refresh();
     } catch {
-      toast.error("Ошибка сети");
+      toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
       setBusy(false);
     }
@@ -139,13 +157,15 @@ export function QuestDetail({
 
   return (
     <div className="flex flex-col gap-5 py-2">
-      <Link
-        href="/quests"
-        className="flex items-center gap-1 text-sm text-muted-foreground"
+      <Button
+        type="button"
+        variant="ghost"
+        className="-ml-3 self-start text-muted-foreground"
+        onClick={goBack}
       >
         <ArrowLeft className="size-4" />
         Квесты
-      </Link>
+      </Button>
 
       <header className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-2">

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -74,6 +75,13 @@ export function QuestsScreen({
   quests: QuestVM[];
   attributes: QuestAttributeOption[];
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const activeTab =
+    requestedTab === "completed" || requestedTab === "archived"
+      ? requestedTab
+      : "active";
   const active = quests.filter(
     (q) => q.status === "active" || q.status === "draft",
   );
@@ -87,7 +95,12 @@ export function QuestsScreen({
         <CreateQuestDrawer attributes={attributes} />
       </div>
 
-      <Tabs defaultValue="active">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) =>
+          router.replace(`/quests?tab=${value}`, { scroll: false })
+        }
+      >
         <TabsList className="w-full">
           <TabsTrigger value="active" className="flex-1">
             Активные

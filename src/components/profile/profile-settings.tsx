@@ -11,13 +11,11 @@ import type {
   ProfileTemplate,
 } from "@/application/profile/get-profile";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  getApiErrorMessage,
+  NETWORK_ERROR_MESSAGE,
+} from "@/lib/http/client-error";
 
 import { TemplateFormDrawer } from "./template-form-drawer";
 
@@ -27,7 +25,7 @@ const THEMES = [
   { value: "system", label: "Системная" },
 ];
 
-const TIMEZONES = [
+const FALLBACK_TIMEZONES = [
   "Asia/Novosibirsk",
   "Asia/Yekaterinburg",
   "Asia/Vladivostok",
@@ -35,6 +33,13 @@ const TIMEZONES = [
   "Europe/Kaliningrad",
   "UTC",
 ];
+
+const TIMEZONES =
+  (
+    Intl as typeof Intl & {
+      supportedValuesOf?: (key: "timeZone") => string[];
+    }
+  ).supportedValuesOf?.("timeZone") ?? FALLBACK_TIMEZONES;
 
 const DAY_LABELS = ["", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
@@ -47,13 +52,12 @@ function scheduleLabel(t: ProfileTemplate): string {
     .join(", ");
 }
 
-async function patchProfile(body: Record<string, string>): Promise<boolean> {
-  const res = await fetch("/api/profile", {
+async function patchProfile(body: Record<string, string>): Promise<Response> {
+  return fetch("/api/profile", {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
-  return res.ok;
 }
 
 export function ProfileSettings({
@@ -68,6 +72,7 @@ export function ProfileSettings({
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [tz, setTz] = useState(timezone);
+  const [savedTz, setSavedTz] = useState(timezone);
   const [busy, setBusy] = useState(false);
 
   const timezoneOptions = TIMEZONES.includes(tz) ? TIMEZONES : [tz, ...TIMEZONES];
@@ -75,19 +80,43 @@ export function ProfileSettings({
   const archived = templates.filter((t) => t.archived);
 
   async function changeTheme(next: string) {
+    const previous = theme ?? "system";
     setTheme(next);
-    if (!(await patchProfile({ theme: next }))) {
-      toast.error("Не удалось сохранить тему");
+    setBusy(true);
+    try {
+      const response = await patchProfile({ theme: next });
+      if (!response.ok) {
+        setTheme(previous);
+        toast.error(await getApiErrorMessage(response, "Не удалось сохранить тему."));
+      }
+    } catch {
+      setTheme(previous);
+      toast.error(NETWORK_ERROR_MESSAGE);
+    } finally {
+      setBusy(false);
     }
   }
 
-  async function changeTimezone(next: string) {
-    setTz(next);
-    if (await patchProfile({ timezone: next })) {
-      toast.success("Часовой пояс обновлён");
-      router.refresh();
-    } else {
-      toast.error("Не удалось обновить часовой пояс");
+  async function changeTimezone() {
+    setBusy(true);
+    try {
+      const response = await patchProfile({ timezone: tz.trim() });
+      if (response.ok) {
+        setSavedTz(tz.trim());
+        setTz(tz.trim());
+        toast.success("Часовой пояс обновлён");
+        router.refresh();
+      } else {
+        setTz(savedTz);
+        toast.error(
+          await getApiErrorMessage(response, "Укажите корректную IANA timezone."),
+        );
+      }
+    } catch {
+      setTz(savedTz);
+      toast.error(NETWORK_ERROR_MESSAGE);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -99,8 +128,12 @@ export function ProfileSettings({
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) toast.error("Не удалось обновить шаблон");
+      if (!res.ok) {
+        toast.error(await getApiErrorMessage(res, "Не удалось обновить шаблон."));
+      }
       else router.refresh();
+    } catch {
+      toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
       setBusy(false);
     }
@@ -110,11 +143,17 @@ export function ProfileSettings({
     setBusy(true);
     try {
       const res = await fetch(`/api/task-templates/${id}`, { method: "DELETE" });
-      if (!res.ok) toast.error("Не удалось архивировать шаблон");
+      if (!res.ok) {
+        toast.error(
+          await getApiErrorMessage(res, "Не удалось архивировать шаблон."),
+        );
+      }
       else {
         toast.success("Шаблон архивирован");
         router.refresh();
       }
+    } catch {
+      toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
       setBusy(false);
     }
@@ -123,8 +162,11 @@ export function ProfileSettings({
   async function logout() {
     setBusy(true);
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
-      router.refresh();
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+      if (response.ok) router.refresh();
+      else toast.error(await getApiErrorMessage(response, "Не удалось выйти."));
+    } catch {
+      toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
       setBusy(false);
     }
@@ -202,7 +244,7 @@ export function ProfileSettings({
       });
       router.refresh();
     } catch {
-      toast.error("Не удалось импортировать файл");
+      toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
       setBusy(false);
       event.target.value = "";
@@ -219,6 +261,7 @@ export function ProfileSettings({
               key={t.value}
               size="sm"
               variant={theme === t.value ? "default" : "outline"}
+              disabled={busy}
               onClick={() => changeTheme(t.value)}
             >
               {t.label}
@@ -229,18 +272,30 @@ export function ProfileSettings({
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium">Часовой пояс</h2>
-        <Select value={tz} onValueChange={changeTimezone}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {timezoneOptions.map((zone) => (
-              <SelectItem key={zone} value={zone}>
-                {zone}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2">
+          <Input
+            value={tz}
+            list="iana-timezones"
+            aria-label="IANA timezone"
+            placeholder="Например, Europe/Moscow"
+            onChange={(event) => setTz(event.target.value)}
+          />
+          <Button
+            variant="outline"
+            disabled={busy || !tz.trim() || tz.trim() === savedTz}
+            onClick={changeTimezone}
+          >
+            Сохранить
+          </Button>
+        </div>
+        <datalist id="iana-timezones">
+          {timezoneOptions.map((zone) => (
+            <option key={zone} value={zone} />
+          ))}
+        </datalist>
+        <p className="text-xs text-muted-foreground">
+          Можно выбрать или ввести любую IANA timezone.
+        </p>
       </section>
 
       <section className="flex flex-col gap-2">
@@ -299,7 +354,7 @@ export function ProfileSettings({
 
         {archived.length > 0 && (
           <details className="text-sm text-muted-foreground">
-            <summary className="cursor-pointer">
+            <summary className="flex min-h-11 cursor-pointer items-center">
               Архив ({archived.length})
             </summary>
             <ul className="mt-2 flex flex-col gap-1">

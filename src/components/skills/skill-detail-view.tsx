@@ -1,7 +1,6 @@
 "use client";
 
 import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -21,6 +20,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import {
+  getApiErrorMessage,
+  NETWORK_ERROR_MESSAGE,
+} from "@/lib/http/client-error";
 
 import { SkillFormDrawer } from "./skill-form-drawer";
 
@@ -35,18 +38,28 @@ export function SkillDetailView({ detail }: { detail: SkillDetail }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
+  function goBack() {
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push("/skills");
+  }
+
   async function archive() {
     setBusy(true);
     try {
       const res = await fetch(`/api/skills/${detail.id}`, { method: "DELETE" });
       if (!res.ok) {
-        toast.error("Не удалось архивировать навык");
+        toast.error(
+          await getApiErrorMessage(res, "Не удалось архивировать навык."),
+        );
         return;
       }
       toast.success("Навык архивирован");
       router.push("/skills");
     } catch {
-      toast.error("Ошибка сети");
+      toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
       setBusy(false);
     }
@@ -54,13 +67,15 @@ export function SkillDetailView({ detail }: { detail: SkillDetail }) {
 
   return (
     <div className="flex flex-col gap-5 py-2">
-      <Link
-        href="/skills"
-        className="flex items-center gap-1 text-sm text-muted-foreground"
+      <Button
+        type="button"
+        variant="ghost"
+        className="-ml-3 self-start text-muted-foreground"
+        onClick={goBack}
       >
         <ArrowLeft className="size-4" />
         Навыки
-      </Link>
+      </Button>
 
       <header className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-2">

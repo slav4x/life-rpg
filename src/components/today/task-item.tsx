@@ -21,6 +21,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DIFFICULTIES } from "@/domain/game/constants";
+import {
+  getApiErrorMessage,
+  NETWORK_ERROR_MESSAGE,
+} from "@/lib/http/client-error";
 import { cn } from "@/lib/utils";
 
 import { TaskFormDrawer } from "./task-form-drawer";
@@ -50,7 +54,7 @@ export function TaskItem({
         headers: { "idempotency-key": crypto.randomUUID() },
       });
       if (!res.ok) {
-        toast.error("Не удалось завершить задачу");
+        toast.error(await getApiErrorMessage(res, "Не удалось завершить задачу."));
         return;
       }
       const result: CompleteTaskResult = await res.json();
@@ -86,7 +90,7 @@ export function TaskItem({
       }
       router.refresh();
     } catch {
-      toast.error("Ошибка сети");
+      toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
       setLoading(false);
     }
@@ -97,13 +101,13 @@ export function TaskItem({
     try {
       const res = await fetch(`/api/tasks/${task.id}/revert`, { method: "POST" });
       if (!res.ok) {
-        toast.error("Не удалось отменить");
+        toast.error(await getApiErrorMessage(res, "Не удалось отменить выполнение."));
         return;
       }
       toast.success("Выполнение отменено");
       router.refresh();
     } catch {
-      toast.error("Ошибка сети");
+      toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
       setLoading(false);
     }

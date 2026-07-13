@@ -29,6 +29,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { QUEST_TYPES } from "@/domain/game/quest";
+import {
+  getApiErrorMessage,
+  NETWORK_ERROR_MESSAGE,
+} from "@/lib/http/client-error";
 
 import type { QuestAttributeOption } from "./types";
 
@@ -186,7 +190,12 @@ export function QuestFormDrawer({
         }),
       });
       if (!res.ok) {
-        toast.error(isEdit ? "Не удалось сохранить квест" : "Не удалось создать квест");
+        toast.error(
+          await getApiErrorMessage(
+            res,
+            isEdit ? "Не удалось сохранить квест." : "Не удалось создать квест.",
+          ),
+        );
         return;
       }
       const result: {
@@ -209,7 +218,7 @@ export function QuestFormDrawer({
       if (!isEdit) resetCreateForm();
       router.refresh();
     } catch {
-      toast.error("Ошибка сети");
+      toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
       setSubmitting(false);
     }

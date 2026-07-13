@@ -25,6 +25,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { BASE_XP, DIFFICULTIES } from "@/domain/game/constants";
+import {
+  getApiErrorMessage,
+  NETWORK_ERROR_MESSAGE,
+} from "@/lib/http/client-error";
 import { cn } from "@/lib/utils";
 
 const WEEKDAYS = [
@@ -103,14 +107,16 @@ export function TemplateFormDrawer({
         }),
       });
       if (!res.ok) {
-        toast.error("Не удалось сохранить шаблон");
+        toast.error(
+          await getApiErrorMessage(res, "Не удалось сохранить шаблон."),
+        );
         return;
       }
       toast.success("Шаблон обновлён");
       setOpen(false);
       router.refresh();
     } catch {
-      toast.error("Ошибка сети");
+      toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
       setBusy(false);
     }
@@ -203,7 +209,7 @@ export function TemplateFormDrawer({
                     type="button"
                     onClick={() => toggleWeekday(d.iso)}
                     className={cn(
-                      "size-10 rounded-lg border text-sm transition-colors",
+                      "size-11 rounded-lg border text-sm transition-colors motion-reduce:transition-none",
                       weekdays.includes(d.iso)
                         ? "border-primary bg-primary text-primary-foreground"
                         : "bg-background hover:bg-muted",

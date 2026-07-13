@@ -55,7 +55,7 @@ export function ProgressScreen({ data }: { data: ProgressData }) {
             key={p.value}
             href={`/progress?period=${p.value}`}
             className={cn(
-              "flex-1 rounded-md py-1.5 text-center",
+              "flex min-h-11 flex-1 items-center justify-center rounded-md text-center",
               data.period === p.value
                 ? "bg-background font-medium"
                 : "text-muted-foreground",

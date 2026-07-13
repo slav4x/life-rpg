@@ -32,6 +32,10 @@ import {
   DIFFICULTIES,
   isDifficulty,
 } from "@/domain/game/constants";
+import {
+  getApiErrorMessage,
+  NETWORK_ERROR_MESSAGE,
+} from "@/lib/http/client-error";
 import { cn } from "@/lib/utils";
 
 import type { SkillOption } from "./types";
@@ -182,7 +186,12 @@ export function TaskFormDrawer({
       }
 
       if (!res.ok) {
-        toast.error(isEdit ? "Не удалось сохранить" : "Не удалось создать");
+        toast.error(
+          await getApiErrorMessage(
+            res,
+            isEdit ? "Не удалось сохранить действие." : "Не удалось создать действие.",
+          ),
+        );
         return;
       }
       toast.success(isEdit ? "Сохранено" : "Готово");
@@ -195,7 +204,7 @@ export function TaskFormDrawer({
       }
       router.refresh();
     } catch {
-      toast.error("Ошибка сети");
+      toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
       setBusy(false);
     }
@@ -206,14 +215,14 @@ export function TaskFormDrawer({
     try {
       const res = await fetch(`/api/tasks/${task!.id}`, { method: "DELETE" });
       if (!res.ok) {
-        toast.error("Не удалось удалить");
+        toast.error(await getApiErrorMessage(res, "Не удалось удалить действие."));
         return;
       }
       toast.success("Действие удалено");
       setOpen(false);
       router.refresh();
     } catch {
-      toast.error("Ошибка сети");
+      toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
       setBusy(false);
     }
@@ -342,7 +351,7 @@ export function TaskFormDrawer({
                     type="button"
                     onClick={() => toggleWeekday(d.iso)}
                     className={cn(
-                      "size-10 rounded-lg border text-sm transition-colors",
+                      "size-11 rounded-lg border text-sm transition-colors motion-reduce:transition-none",
                       weekdays.includes(d.iso)
                         ? "border-primary bg-primary text-primary-foreground"
                         : "bg-background hover:bg-muted",

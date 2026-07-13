@@ -54,7 +54,7 @@ export function TodayScreen(props: TodayScreenProps) {
         <div className="flex items-center justify-between">
           <Link
             href={dateHref(prev, props.today)}
-            className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+            className="flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
             aria-label="Предыдущий день"
           >
             <ChevronLeft className="size-5" />
@@ -64,14 +64,17 @@ export function TodayScreen(props: TodayScreenProps) {
               {formatDate(props.date)}
             </span>
             {!isToday && (
-              <Link href="/" className="text-xs text-muted-foreground underline">
+              <Link
+                href="/"
+                className="inline-flex min-h-11 items-center text-xs text-muted-foreground underline"
+              >
                 к сегодня
               </Link>
             )}
           </div>
           <Link
             href={dateHref(next, props.today)}
-            className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+            className="flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
             aria-label="Следующий день"
           >
             <ChevronRight className="size-5" />

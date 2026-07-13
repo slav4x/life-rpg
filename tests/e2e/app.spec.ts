@@ -9,6 +9,32 @@ test("logs in via dev bypass and shows the Today screen", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /Привет/ })).toBeVisible({
     timeout: 15000,
   });
+
+  const viewport = await page
+    .locator('meta[name="viewport"]')
+    .getAttribute("content");
+  expect(viewport).not.toContain("user-scalable=no");
+  expect(viewport).not.toContain("maximum-scale=1");
+
+  const addButton = await page
+    .getByRole("button", { name: "Добавить" })
+    .boundingBox();
+  expect(addButton?.width).toBeGreaterThanOrEqual(44);
+  expect(addButton?.height).toBeGreaterThanOrEqual(44);
+});
+
+test("respects reduced motion", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Привет/ })).toBeVisible({
+    timeout: 15000,
+  });
+
+  const transitionDuration = await page
+    .locator('[data-slot="progress-indicator"]')
+    .first()
+    .evaluate((element) => getComputedStyle(element).transitionDuration);
+  expect(["0s", "0.00001s"]).toContain(transitionDuration);
 });
 
 test("bottom navigation reaches every screen", async ({ page }) => {
@@ -191,6 +217,59 @@ test("creates, edits, archives and links a quest step to a task", async ({ page 
   await page.getByRole("button", { name: "Архивировать" }).first().click();
   await page.getByRole("button", { name: "Архивировать" }).last().click();
   await expect(page.getByText("Квест находится в архиве.")).toBeVisible();
+
+  await page.getByRole("button", { name: "Квесты" }).click();
+  await page.getByRole("tab", { name: "Архив" }).click();
+  await expect(page).toHaveURL(/\/quests\?tab=archived$/);
+  await page.getByRole("link", { name: new RegExp(title) }).click();
+  await page.getByRole("button", { name: "Квесты" }).click();
+  await expect(page.getByRole("tab", { name: "Архив" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await page.getByRole("link", { name: new RegExp(title) }).click();
   await page.getByRole("button", { name: "Вернуть в активные" }).click();
   await expect(page.getByRole("button", { name: "Изменить" })).toBeVisible();
+});
+
+test("offers the full IANA timezone list and rolls theme back on API failure", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Привет/ })).toBeVisible({
+    timeout: 15000,
+  });
+  await page.getByRole("link", { name: "Профиль" }).click();
+
+  await expect(page.getByLabel("IANA timezone")).toBeVisible();
+  expect(await page.locator("#iana-timezones option").count()).toBeGreaterThan(100);
+
+  const wasDark = await page
+    .locator("html")
+    .evaluate((element) => element.classList.contains("dark"));
+  await page.route("**/api/profile", async (route) => {
+    if (route.request().method() === "PATCH") {
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "internal_error" }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page
+    .getByRole("button", { name: wasDark ? "Светлая" : "Тёмная" })
+    .click();
+  await expect(
+    page.getByText("Сервер не смог выполнить операцию. Повторите позже."),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      page
+        .locator("html")
+        .evaluate((element) => element.classList.contains("dark")),
+    )
+    .toBe(wasDark);
 });
