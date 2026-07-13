@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
 import {
@@ -49,6 +49,27 @@ export async function listSkillTransactions(
     )
     .orderBy(desc(xpTransactions.createdAt))
     .limit(limit);
+}
+
+/** Whether the skill has ever received XP, including subsequently reverted XP. */
+export async function hasSkillXpHistory(
+  db: DbClient,
+  userId: string,
+  skillId: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: xpTransactions.id })
+    .from(xpTransactions)
+    .where(
+      and(
+        eq(xpTransactions.userId, userId),
+        eq(xpTransactions.skillId, skillId),
+        eq(xpTransactions.scope, "skill"),
+        gt(xpTransactions.amount, 0),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
 }
 
 /** The accrual transactions written for a task completion (for reversal). */

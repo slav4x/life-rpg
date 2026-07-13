@@ -1,4 +1,7 @@
+import { Check, Lock } from "lucide-react";
+
 import type { ProfileData } from "@/application/profile/get-profile";
+import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +13,14 @@ interface ProfileScreenProps {
   username: string | null;
   timezone: string;
   data: ProfileData;
+}
+
+function formatUnlockDate(value: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(value));
 }
 
 export function ProfileScreen({
@@ -81,18 +92,50 @@ export function ProfileScreen({
             {unlockedCount} / {data.achievements.length}
           </span>
         </h2>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid gap-2 sm:grid-cols-2">
           {data.achievements.map((a) => (
             <div
               key={a.code}
-              title={a.description}
               className={cn(
-                "flex flex-col items-center gap-1 rounded-xl border bg-card px-2 py-3 text-center",
-                !a.unlocked && "opacity-30",
+                "flex items-start gap-3 rounded-xl border bg-card p-3",
+                !a.unlocked && "bg-muted/30 text-muted-foreground",
               )}
             >
-              <span className="text-xl">{a.icon ?? "🏅"}</span>
-              <span className="text-[11px] leading-tight">{a.name}</span>
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xl",
+                  !a.unlocked && "grayscale",
+                )}
+              >
+                {a.icon ?? "🏅"}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-sm font-medium text-foreground">
+                    {a.name}
+                  </span>
+                  <Badge
+                    variant={a.unlocked ? "secondary" : "outline"}
+                    className="shrink-0 gap-1 font-normal"
+                  >
+                    {a.unlocked ? (
+                      <Check className="size-3" />
+                    ) : (
+                      <Lock className="size-3" />
+                    )}
+                    {a.unlocked ? "Получено" : "Закрыто"}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {a.description}
+                </p>
+                {a.unlockedAt && (
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    {formatUnlockDate(a.unlockedAt)}
+                  </p>
+                )}
+              </div>
             </div>
           ))}
         </div>

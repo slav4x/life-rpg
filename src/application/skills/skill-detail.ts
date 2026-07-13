@@ -3,7 +3,11 @@ import { getDb } from "@/db/client";
 import { listAttributes } from "@/db/repositories/attributes";
 import { getSkillById } from "@/db/repositories/skills";
 import { listRecentTasksBySkill } from "@/db/repositories/tasks";
-import { getUserSkillXp, listSkillTransactions } from "@/db/repositories/xp";
+import {
+  getUserSkillXp,
+  hasSkillXpHistory,
+  listSkillTransactions,
+} from "@/db/repositories/xp";
 import { levelProgress, type LevelProgress } from "@/domain/game/calculate-level";
 
 export interface SkillHistoryEntry {
@@ -22,7 +26,11 @@ export interface SkillDetail {
   id: string;
   name: string;
   description: string | null;
+  icon: string | null;
+  color: string | null;
+  attributeCode: string;
   attributeName: string;
+  canChangeAttribute: boolean;
   xp: number;
   level: LevelProgress;
   history: SkillHistoryEntry[];
@@ -37,21 +45,25 @@ export async function getSkillDetail(
   const skill = await getSkillById(db, userId, skillId);
   if (!skill) throw new GameError("skill_not_found", "Skill not found");
 
-  const [attrs, xp, transactions, tasks] = await Promise.all([
+  const [attrs, xp, transactions, tasks, hasXpHistory] = await Promise.all([
     listAttributes(db),
     getUserSkillXp(db, userId, skillId),
     listSkillTransactions(db, userId, skillId, 20),
     listRecentTasksBySkill(db, userId, skillId, 10),
+    hasSkillXpHistory(db, userId, skillId),
   ]);
 
-  const attributeName =
-    attrs.find((a) => a.id === skill.attributeId)?.name ?? "";
+  const attribute = attrs.find((a) => a.id === skill.attributeId);
 
   return {
     id: skill.id,
     name: skill.name,
     description: skill.description,
-    attributeName,
+    icon: skill.icon,
+    color: skill.color,
+    attributeCode: attribute?.code ?? "body",
+    attributeName: attribute?.name ?? "",
+    canChangeAttribute: !hasXpHistory,
     xp,
     level: levelProgress(xp),
     history: transactions.map((t) => ({

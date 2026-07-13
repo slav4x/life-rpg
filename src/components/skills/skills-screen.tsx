@@ -30,8 +30,24 @@ export function SkillsScreen({ groups }: { groups: AttributeGroup[] }) {
                   href={`/skills/${skill.id}`}
                   className="flex flex-col gap-1.5 rounded-xl border bg-card px-3 py-2.5"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{skill.name}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
+                      <span
+                        aria-hidden="true"
+                        className="flex size-8 shrink-0 items-center justify-center rounded-lg border text-base"
+                        style={
+                          skill.color
+                            ? {
+                                backgroundColor: `${skill.color}1A`,
+                                borderColor: `${skill.color}66`,
+                              }
+                            : undefined
+                        }
+                      >
+                        {skill.icon ?? "✨"}
+                      </span>
+                      <span className="truncate">{skill.name}</span>
+                    </span>
                     <span className="text-xs text-muted-foreground">
                       Ур. {skill.level.level} · {skill.xp} XP
                     </span>

@@ -18,7 +18,13 @@ export async function GET() {
   }
   const skills = await listActiveSkills(getDb(), user.id);
   return NextResponse.json({
-    skills: skills.map((s) => ({ id: s.id, name: s.name, attributeId: s.attributeId })),
+    skills: skills.map((s) => ({
+      id: s.id,
+      name: s.name,
+      attributeId: s.attributeId,
+      icon: s.icon,
+      color: s.color,
+    })),
   });
 }
 

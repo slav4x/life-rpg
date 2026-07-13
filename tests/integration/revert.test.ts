@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { completeTask } from "@/application/tasks/complete-task";
 import { ensureTasksForDate } from "@/application/tasks/ensure-daily-tasks";
 import { revertTask } from "@/application/tasks/revert-task";
+import { listUserAchievements } from "@/db/repositories/achievements";
 import { ensureAttributes, listAttributes } from "@/db/repositories/attributes";
 import { createSkill } from "@/db/repositories/skills";
 import { createTemplate } from "@/db/repositories/task-templates";
@@ -71,6 +72,7 @@ describe.skipIf(!url)("revert & concurrency (integration)", () => {
   it("rolls back XP and returns the task to pending", async () => {
     const task = await oneOff(50);
     await completeTask({ userId, taskId: task.id, idempotencyKey: "k1" }, db);
+    const unlockedBeforeRevert = await listUserAchievements(db, userId);
 
     const result = await revertTask({ userId, taskId: task.id }, db);
     expect(result.reverted).toBe(true);
@@ -86,6 +88,7 @@ describe.skipIf(!url)("revert & concurrency (integration)", () => {
     expect(await db.select().from(xpTransactions)).toHaveLength(6);
     const [completion] = await db.select().from(taskCompletions);
     expect(completion.revertedAt).not.toBeNull();
+    expect(await listUserAchievements(db, userId)).toEqual(unlockedBeforeRevert);
   });
 
   it("can be completed again after a revert", async () => {

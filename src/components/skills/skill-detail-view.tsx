@@ -64,7 +64,25 @@ export function SkillDetailView({ detail }: { detail: SkillDetail }) {
 
       <header className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-2">
-          <h1 className="text-xl font-semibold tracking-tight">{detail.name}</h1>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span
+              aria-hidden="true"
+              className="flex size-10 shrink-0 items-center justify-center rounded-xl border text-xl"
+              style={
+                detail.color
+                  ? {
+                      backgroundColor: `${detail.color}1A`,
+                      borderColor: `${detail.color}66`,
+                    }
+                  : undefined
+              }
+            >
+              {detail.icon ?? "✨"}
+            </span>
+            <h1 className="truncate text-xl font-semibold tracking-tight">
+              {detail.name}
+            </h1>
+          </div>
           <Badge variant="secondary" className="shrink-0 font-normal">
             {detail.attributeName}
           </Badge>
@@ -96,6 +114,10 @@ export function SkillDetailView({ detail }: { detail: SkillDetail }) {
               id: detail.id,
               name: detail.name,
               description: detail.description,
+              attributeCode: detail.attributeCode,
+              icon: detail.icon,
+              color: detail.color,
+              canChangeAttribute: detail.canChangeAttribute,
             }}
           />
           <AlertDialog>

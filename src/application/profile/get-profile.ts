@@ -26,6 +26,7 @@ export interface ProfileAchievement {
   description: string;
   icon: string | null;
   unlocked: boolean;
+  unlockedAt: string | null;
 }
 
 export interface ProfileTemplate {
@@ -70,7 +71,9 @@ export async function getProfileData(
       listActiveSkills(db, userId),
     ]);
 
-  const unlockedIds = new Set(userAchievements.map((u) => u.achievementId));
+  const unlockedById = new Map(
+    userAchievements.map((item) => [item.achievementId, item.unlockedAt]),
+  );
 
   return {
     totalXp,
@@ -81,7 +84,8 @@ export async function getProfileData(
       name: a.name,
       description: a.description,
       icon: a.icon,
-      unlocked: unlockedIds.has(a.id),
+      unlocked: unlockedById.has(a.id),
+      unlockedAt: unlockedById.get(a.id)?.toISOString() ?? null,
     })),
     templates: templates.map((t) => ({
       id: t.id,

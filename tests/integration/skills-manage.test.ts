@@ -9,6 +9,7 @@ import {
   updateUserSkill,
 } from "@/application/skills/manage-skill";
 import { completeTask } from "@/application/tasks/complete-task";
+import { revertTask } from "@/application/tasks/revert-task";
 import { ensureAttributes, listAttributes } from "@/db/repositories/attributes";
 import { createSkill } from "@/db/repositories/skills";
 import { createTemplate } from "@/db/repositories/task-templates";
@@ -50,7 +51,30 @@ describe.skipIf(!url)("skill management (integration)", () => {
     skillId = skill.id;
   });
 
-  it("renames a skill but forbids changing its attribute after XP", async () => {
+  it("changes attribute and visuals before the first XP accrual", async () => {
+    const bodyId = (await listAttributes(db)).find((a) => a.code === "body")!.id;
+
+    const updated = await updateUserSkill(
+      userId,
+      skillId,
+      {
+        name: "React",
+        attributeCode: "body",
+        icon: "🧠",
+        color: "#0EA5E9",
+      },
+      db,
+    );
+
+    expect(updated).toMatchObject({
+      name: "React",
+      attributeId: bodyId,
+      icon: "🧠",
+      color: "#0EA5E9",
+    });
+  });
+
+  it("renames a skill but forbids changing its attribute after XP history", async () => {
     const task = await createTask(db, {
       userId,
       skillId,
@@ -66,6 +90,11 @@ describe.skipIf(!url)("skill management (integration)", () => {
     expect(renamed.name).toBe("React");
 
     // Changing the attribute after XP is rejected.
+    await expect(
+      updateUserSkill(userId, skillId, { attributeCode: "body" }, db),
+    ).rejects.toMatchObject({ code: "invalid_input" });
+
+    await revertTask({ userId, taskId: task.id }, db);
     await expect(
       updateUserSkill(userId, skillId, { attributeCode: "body" }, db),
     ).rejects.toMatchObject({ code: "invalid_input" });

@@ -26,12 +26,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ATTRIBUTES } from "@/domain/game/constants";
+import {
+  ATTRIBUTES,
+  SKILL_COLORS,
+  SKILL_ICONS,
+} from "@/domain/game/constants";
+import { cn } from "@/lib/utils";
+
+interface EditableSkill {
+  id: string;
+  name: string;
+  description: string | null;
+  attributeCode: string;
+  icon: string | null;
+  color: string | null;
+  canChangeAttribute: boolean;
+}
 
 export function SkillFormDrawer({
   skill,
 }: {
-  skill?: { id: string; name: string; description: string | null };
+  skill?: EditableSkill;
 }) {
   const router = useRouter();
   const isEdit = Boolean(skill);
@@ -39,8 +54,12 @@ export function SkillFormDrawer({
   const [submitting, setSubmitting] = useState(false);
 
   const [name, setName] = useState(skill?.name ?? "");
-  const [attributeCode, setAttributeCode] = useState("body");
+  const [attributeCode, setAttributeCode] = useState(
+    skill?.attributeCode ?? "body",
+  );
   const [description, setDescription] = useState(skill?.description ?? "");
+  const [icon, setIcon] = useState(skill?.icon ?? SKILL_ICONS[0]);
+  const [color, setColor] = useState(skill?.color ?? SKILL_COLORS[0]);
 
   async function submit() {
     const trimmed = name.trim();
@@ -57,13 +76,13 @@ export function SkillFormDrawer({
           method: isEdit ? "PATCH" : "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(
-            isEdit
-              ? { name: trimmed, description: description.trim() || null }
-              : {
-                  name: trimmed,
-                  attributeCode,
-                  description: description.trim() || undefined,
-                },
+            {
+              name: trimmed,
+              attributeCode,
+              description: description.trim() || (isEdit ? null : undefined),
+              icon,
+              color,
+            },
           ),
         },
       );
@@ -117,23 +136,75 @@ export function SkillFormDrawer({
               />
             </div>
 
-            {!isEdit && (
-              <div className="flex flex-col gap-1.5">
-                <Label>Характеристика</Label>
-                <Select value={attributeCode} onValueChange={setAttributeCode}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ATTRIBUTES.map((a) => (
-                      <SelectItem key={a.code} value={a.code}>
-                        {a.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="flex flex-col gap-1.5">
+              <Label>Характеристика</Label>
+              <Select
+                value={attributeCode}
+                onValueChange={setAttributeCode}
+                disabled={isEdit && !skill?.canChangeAttribute}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ATTRIBUTES.map((a) => (
+                    <SelectItem key={a.code} value={a.code}>
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isEdit && !skill?.canChangeAttribute && (
+                <p className="text-xs text-muted-foreground">
+                  После первого начисления XP характеристику изменить нельзя.
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Иконка</Label>
+              <div className="grid grid-cols-8 gap-1.5">
+                {SKILL_ICONS.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-label={`Иконка ${option}`}
+                    aria-pressed={icon === option}
+                    onClick={() => setIcon(option)}
+                    className={cn(
+                      "flex aspect-square items-center justify-center rounded-lg border text-lg transition-colors",
+                      icon === option
+                        ? "border-primary bg-primary/10"
+                        : "bg-background",
+                    )}
+                  >
+                    {option}
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Цвет</Label>
+              <div className="grid grid-cols-8 gap-1.5">
+                {SKILL_COLORS.map((option, index) => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-label={`Цвет ${index + 1}`}
+                    aria-pressed={color === option}
+                    onClick={() => setColor(option)}
+                    className={cn(
+                      "aspect-square rounded-full border-2 transition-transform",
+                      color === option
+                        ? "scale-90 border-foreground"
+                        : "border-transparent",
+                    )}
+                    style={{ backgroundColor: option }}
+                  />
+                ))}
+              </div>
+            </div>
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="skill-desc">Описание (необязательно)</Label>

@@ -7,6 +7,17 @@ import { toast } from "sonner";
 
 import type { CompleteTaskResult } from "@/application/tasks/complete-task";
 import { showAchievementToasts } from "@/components/achievements/achievement-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DIFFICULTIES } from "@/domain/game/constants";
@@ -139,15 +150,33 @@ export function TaskItem({
 
       {done ? (
         <div className="flex shrink-0 items-center gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-muted-foreground"
-            onClick={revert}
-            disabled={loading}
-          >
-            Отменить
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-muted-foreground"
+                disabled={loading}
+              >
+                Отменить
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Отменить выполнение?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Начисленный XP будет списан, а серия пересчитана. Уже открытые
+                  достижения останутся полученными.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Назад</AlertDialogCancel>
+                <AlertDialogAction onClick={revert}>
+                  Отменить выполнение
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Check className="size-5 text-primary" aria-label="Выполнено" />
         </div>
       ) : (

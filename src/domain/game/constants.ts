@@ -67,3 +67,17 @@ export const STARTER_SKILLS: StarterSkill[] = [
   { name: "Фокус", attribute: "discipline" },
   { name: "Код", attribute: "creation" },
 ];
+
+/** Small curated visual set for user skills (SPEC §5.3). */
+export const SKILL_ICONS = ["✨", "💪", "🧠", "💼", "🤝", "🎨", "⚡", "📚"] as const;
+
+export const SKILL_COLORS = [
+  "#6366F1",
+  "#0EA5E9",
+  "#14B8A6",
+  "#22C55E",
+  "#F59E0B",
+  "#F97316",
+  "#EC4899",
+  "#8B5CF6",
+] as const;

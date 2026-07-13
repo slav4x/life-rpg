@@ -6,6 +6,8 @@ import { levelProgress, type LevelProgress } from "@/domain/game/calculate-level
 export interface SkillOverviewItem {
   id: string;
   name: string;
+  icon: string | null;
+  color: string | null;
   xp: number;
   level: LevelProgress;
 }
@@ -29,7 +31,14 @@ export async function getSkillsOverview(
   const byAttribute = new Map<string, SkillOverviewItem[]>();
   for (const { skill, xp } of skills) {
     const list = byAttribute.get(skill.attributeId) ?? [];
-    list.push({ id: skill.id, name: skill.name, xp, level: levelProgress(xp) });
+    list.push({
+      id: skill.id,
+      name: skill.name,
+      icon: skill.icon,
+      color: skill.color,
+      xp,
+      level: levelProgress(xp),
+    });
     byAttribute.set(skill.attributeId, list);
   }
 

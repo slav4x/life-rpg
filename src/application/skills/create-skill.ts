@@ -9,6 +9,8 @@ export interface CreateSkillCommand {
   name: string;
   attributeCode: string;
   description?: string;
+  icon?: string;
+  color?: string;
 }
 
 export async function createUserSkill(cmd: CreateSkillCommand): Promise<Skill> {
@@ -25,5 +27,7 @@ export async function createUserSkill(cmd: CreateSkillCommand): Promise<Skill> {
     attributeId: attribute.id,
     name: cmd.name,
     description: cmd.description ?? null,
+    icon: cmd.icon ?? null,
+    color: cmd.color ?? null,
   });
 }

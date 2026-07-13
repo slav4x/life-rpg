@@ -30,22 +30,58 @@ test("bottom navigation reaches every screen", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Характеристики" }),
   ).toBeVisible();
+  await expect(page.getByText("Выполните первое действие")).toBeVisible();
 });
 
 test("creates a one-off action", async ({ page }) => {
+  const title = `E2E действие ${Date.now()}`;
+
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Привет/ })).toBeVisible({
     timeout: 15000,
   });
 
   await page.getByRole("button", { name: "Добавить" }).click();
-  await page.getByLabel("Название").fill("E2E пробежка");
+  await page.getByLabel("Название").fill(title);
   await page
     .getByRole("dialog", { name: "Новое действие" })
     .getByRole("button", { name: "Добавить", exact: true })
     .click();
 
-  await expect(page.getByText("E2E пробежка")).toBeVisible();
+  const task = page.getByRole("listitem").filter({ hasText: title });
+  await expect(task).toBeVisible();
+  await task.getByRole("button", { name: "Готово" }).click();
+  await task.getByRole("button", { name: "Отменить" }).click();
+  await expect(
+    page.getByText("Уже открытые достижения останутся полученными."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Назад" }).click();
+});
+
+test("creates and customizes a skill before earning XP", async ({ page }) => {
+  const title = `E2E навык ${Date.now()}`;
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Привет/ })).toBeVisible({
+    timeout: 15000,
+  });
+  await page.getByRole("link", { name: "Навыки" }).click();
+  await page.getByRole("button", { name: "Навык" }).click();
+
+  const createDialog = page.getByRole("dialog", { name: "Новый навык" });
+  await createDialog.getByLabel("Название").fill(title);
+  await createDialog.getByRole("button", { name: "Иконка 🧠" }).click();
+  await createDialog.getByRole("button", { name: "Цвет 2" }).click();
+  await createDialog.getByRole("button", { name: "Создать" }).click();
+
+  await page.getByRole("link", { name: new RegExp(title) }).click();
+  await page.getByRole("button", { name: "Изменить" }).click();
+  const editDialog = page.getByRole("dialog", { name: "Изменить навык" });
+  await editDialog.getByRole("combobox").click();
+  await page.getByRole("option", { name: "Разум" }).click();
+  await editDialog.getByRole("button", { name: "Сохранить" }).click();
+
+  await expect(page.getByText("Разум", { exact: true })).toBeVisible();
 });
 
 test("creates, edits, archives and links a quest step to a task", async ({ page }) => {

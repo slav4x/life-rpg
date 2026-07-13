@@ -21,7 +21,9 @@ export async function GET() {
     listAchievements(db),
     listUserAchievements(db, user.id),
   ]);
-  const unlockedIds = new Set(unlocked.map((u) => u.achievementId));
+  const unlockedById = new Map(
+    unlocked.map((item) => [item.achievementId, item.unlockedAt]),
+  );
 
   return NextResponse.json({
     achievements: all.map((a) => ({
@@ -29,7 +31,8 @@ export async function GET() {
       name: a.name,
       description: a.description,
       icon: a.icon,
-      unlocked: unlockedIds.has(a.id),
+      unlocked: unlockedById.has(a.id),
+      unlockedAt: unlockedById.get(a.id)?.toISOString() ?? null,
     })),
   });
 }
