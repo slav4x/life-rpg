@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { completeTask } from "@/application/tasks/complete-task";
 import { cancelTask, editTask } from "@/application/tasks/edit-task";
 import { ensureTasksForDate } from "@/application/tasks/ensure-daily-tasks";
+import { resolveOverdueTasks } from "@/application/tasks/resolve-overdue-tasks";
 import { ensureAttributes, listAttributes } from "@/db/repositories/attributes";
 import { createSkill } from "@/db/repositories/skills";
 import { createTemplate } from "@/db/repositories/task-templates";
@@ -202,5 +203,157 @@ describe.skipIf(!url)("edit & cancel task (integration)", () => {
     await cancelTask(userId, tplTask.id, db);
     const [row] = await db.select().from(tasks).where(eq(tasks.id, tplTask.id));
     expect(row.status).toBe("cancelled");
+  });
+
+  it("reschedules old recurring occurrences as one-off tasks without target conflicts", async () => {
+    const template = await createTemplate(db, {
+      userId,
+      skillId,
+      title: "Ежедневная практика",
+      baseXp: 20,
+      difficulty: "normal",
+      recurrenceType: "daily",
+      startsOn: DATE,
+    });
+    for (const offset of [0, 1, 2]) {
+      await ensureTasksForDate(userId, addDaysToDate(DATE, offset), db);
+    }
+    const occurrences = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.templateId, template.id))
+      .orderBy(tasks.localDate);
+
+    await resolveOverdueTasks(
+      userId,
+      addDaysToDate(DATE, 3),
+      {
+        action: "reschedule",
+        taskIds: [occurrences[0].id],
+        targetDate: addDaysToDate(DATE, 2),
+      },
+      db,
+    );
+
+    const [moved] = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.id, occurrences[0].id));
+    expect(moved.localDate).toBe(addDaysToDate(DATE, 2));
+    expect(moved.templateId).toBeNull();
+    expect(
+      await db.select().from(tasks).where(eq(tasks.templateId, template.id)),
+    ).toHaveLength(2);
+  });
+
+  it("keeps debts older than the completion window available for rescheduling", async () => {
+    const task = await oneOff();
+    const today = addDaysToDate(DATE, 30);
+
+    await resolveOverdueTasks(
+      userId,
+      today,
+      { action: "reschedule", taskIds: [task.id], targetDate: today },
+      db,
+    );
+
+    const [moved] = await db.select().from(tasks).where(eq(tasks.id, task.id));
+    expect(moved.localDate).toBe(today);
+    expect(moved.status).toBe("pending");
+  });
+
+  it("atomically skips recurring tasks and deletes one-off overdue tasks", async () => {
+    const oneOffTask = await oneOff();
+    const template = await createTemplate(db, {
+      userId,
+      skillId,
+      title: "Шаблон разбора",
+      baseXp: 20,
+      difficulty: "normal",
+      recurrenceType: "daily",
+      startsOn: DATE,
+    });
+    await ensureTasksForDate(userId, DATE, db);
+    await ensureTasksForDate(userId, addDaysToDate(DATE, 1), db);
+    const occurrences = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.templateId, template.id))
+      .orderBy(tasks.localDate);
+
+    await resolveOverdueTasks(
+      userId,
+      addDaysToDate(DATE, 2),
+      {
+        action: "dismiss",
+        taskIds: [oneOffTask.id, occurrences[0].id],
+        scope: "this",
+      },
+      db,
+    );
+
+    expect(
+      await db.select().from(tasks).where(eq(tasks.id, oneOffTask.id)),
+    ).toHaveLength(0);
+    const templateRows = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.templateId, template.id))
+      .orderBy(tasks.localDate);
+    expect(templateRows.map((task) => task.status)).toEqual([
+      "cancelled",
+      "pending",
+    ]);
+  });
+
+  it("pauses a repetition and cancels only pending current and future occurrences", async () => {
+    const template = await createTemplate(db, {
+      userId,
+      skillId,
+      title: "Пауза",
+      baseXp: 20,
+      difficulty: "normal",
+      recurrenceType: "daily",
+      startsOn: DATE,
+    });
+    for (const offset of [0, 1, 2]) {
+      await ensureTasksForDate(userId, addDaysToDate(DATE, offset), db);
+    }
+    const occurrences = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.templateId, template.id))
+      .orderBy(tasks.localDate);
+    await db
+      .update(tasks)
+      .set({ status: "completed" })
+      .where(eq(tasks.id, occurrences[1].id));
+
+    await resolveOverdueTasks(
+      userId,
+      addDaysToDate(DATE, 3),
+      {
+        action: "dismiss",
+        taskIds: [occurrences[0].id],
+        scope: "future",
+      },
+      db,
+    );
+
+    const [updatedTemplate] = await db
+      .select()
+      .from(taskTemplates)
+      .where(eq(taskTemplates.id, template.id));
+    expect(updatedTemplate.isActive).toBe(false);
+    const rows = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.templateId, template.id))
+      .orderBy(tasks.localDate);
+    expect(rows.map((task) => task.status)).toEqual([
+      "cancelled",
+      "completed",
+      "cancelled",
+    ]);
   });
 });

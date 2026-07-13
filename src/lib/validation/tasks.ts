@@ -36,3 +36,28 @@ export const updateTaskInputSchema = z
 
 export type CreateTaskInput = z.infer<typeof createTaskInputSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskInputSchema>;
+
+const overdueTaskIds = z
+  .array(z.uuid())
+  .min(1)
+  .max(100)
+  .refine((ids) => new Set(ids).size === ids.length, {
+    message: "task ids must be unique",
+  });
+
+export const resolveOverdueTasksInputSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("reschedule"),
+    taskIds: overdueTaskIds,
+    targetDate: isoDateSchema,
+  }),
+  z.object({
+    action: z.literal("dismiss"),
+    taskIds: overdueTaskIds,
+    scope: z.enum(["this", "future"]).default("this"),
+  }),
+]);
+
+export type ResolveOverdueTasksInput = z.infer<
+  typeof resolveOverdueTasksInputSchema
+>;

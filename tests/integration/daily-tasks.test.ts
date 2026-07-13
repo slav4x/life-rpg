@@ -159,6 +159,14 @@ describe.skipIf(!url)("ensureTasksForDate (integration)", () => {
       DATE,
       addDaysToDate(DATE, 3),
     ]);
+    expect(summary.overdueTasks).toEqual([
+      expect.objectContaining({
+        title: "Просрочено",
+        localDate: addDaysToDate(DATE, -1),
+        skillName: "Кардио",
+        tooOldToComplete: false,
+      }),
+    ]);
   });
 
   it("orders pending tasks by explicit priority", async () => {

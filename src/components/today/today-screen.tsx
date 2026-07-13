@@ -8,6 +8,7 @@ import { addDaysToDate } from "@/lib/dates/local-date";
 
 import { TaskFormDrawer } from "./task-form-drawer";
 import { TaskItem } from "./task-item";
+import { OverdueTasksPanel } from "./overdue-tasks-panel";
 import type { SkillOption, TaskVM } from "./types";
 
 interface TodayScreenProps {
@@ -151,23 +152,11 @@ export function TodayScreen(props: TodayScreenProps) {
           </a>
         </div>
 
-        {props.planning.overdue.length > 0 && (
-          <details id="overdue" className="text-xs">
-            <summary className="flex min-h-11 cursor-pointer items-center text-muted-foreground">
-              Просроченные даты
-            </summary>
-            <div className="flex flex-wrap gap-2 pb-1">
-              {props.planning.overdue.map((item) => (
-                <Link
-                  key={item.date}
-                  href={dateHref(item.date, props.today)}
-                  className="rounded-md border px-2 py-1.5"
-                >
-                  {shortDate(item.date)} · {item.count}
-                </Link>
-              ))}
-            </div>
-          </details>
+        {props.planning.overdueTasks.length > 0 && (
+          <OverdueTasksPanel
+            tasks={props.planning.overdueTasks}
+            today={props.today}
+          />
         )}
 
         <div id="next-seven" className="flex flex-wrap gap-2">

@@ -1,4 +1,17 @@
-import { and, asc, desc, eq, gt, lt, lte, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  lt,
+  lte,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
 import {
@@ -98,6 +111,30 @@ export async function listTasksForDate(
     );
 }
 
+/** All unresolved tasks before today, oldest and highest-priority first. */
+export async function listOverdueTasks(
+  db: DbClient,
+  userId: string,
+  today: string,
+): Promise<TaskWithSkill[]> {
+  return db
+    .select({ task: tasks, skill: skills })
+    .from(tasks)
+    .innerJoin(skills, eq(skills.id, tasks.skillId))
+    .where(
+      and(
+        eq(tasks.userId, userId),
+        eq(tasks.status, "pending"),
+        lt(tasks.localDate, today),
+      ),
+    )
+    .orderBy(
+      asc(tasks.localDate),
+      sql`case ${tasks.priority} when 'high' then 0 when 'normal' then 1 else 2 end`,
+      asc(tasks.createdAt),
+    );
+}
+
 export async function listRecentTasksBySkill(
   db: DbClient,
   userId: string,
@@ -138,6 +175,21 @@ export async function getTaskById(
     .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
     .limit(1);
   return task;
+}
+
+/** Lock a bounded set in stable order for an atomic bulk operation. */
+export async function lockTasksByIds(
+  db: DbClient,
+  userId: string,
+  ids: string[],
+): Promise<Task[]> {
+  if (ids.length === 0) return [];
+  return db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.userId, userId), inArray(tasks.id, ids)))
+    .orderBy(asc(tasks.id))
+    .for("update");
 }
 
 export async function getActiveTaskByQuestStepId(
@@ -197,6 +249,7 @@ export async function listTaskLinksForQuest(
 export interface UpdateTaskFields {
   title?: string;
   description?: string | null;
+  templateId?: string | null;
   skillId?: string;
   localDate?: string;
   baseXp?: number;
@@ -260,6 +313,26 @@ export async function cancelPendingTasksOutsideTemplateRange(
         eq(tasks.templateId, templateId),
         eq(tasks.status, "pending"),
         outside,
+      ),
+    );
+}
+
+/** Cancel this and later pending occurrences when a repetition is paused. */
+export async function cancelPendingTasksFromTemplateDate(
+  db: DbClient,
+  userId: string,
+  templateId: string,
+  fromDate: string,
+): Promise<void> {
+  await db
+    .update(tasks)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(
+      and(
+        eq(tasks.userId, userId),
+        eq(tasks.templateId, templateId),
+        eq(tasks.status, "pending"),
+        gte(tasks.localDate, fromDate),
       ),
     );
 }

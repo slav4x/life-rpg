@@ -128,6 +128,96 @@ test("sets task priority and filters long lists", async ({ page }) => {
   await expect(page.getByText("Нет активных квестов этого типа.")).toBeVisible();
 });
 
+test("bulk-reschedules overdue tasks and pauses a recurring debt", async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const firstTitle = `E2E долг A ${suffix}`;
+  const secondTitle = `E2E долг B ${suffix}`;
+  const recurringTitle = `E2E повтор-долг ${suffix}`;
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Привет/ })).toBeVisible({
+    timeout: 15000,
+  });
+  const today = await page.getByLabel("Перейти к дате").inputValue();
+  const yesterdayDate = new Date(`${today}T00:00:00Z`);
+  yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
+  const yesterday = yesterdayDate.toISOString().slice(0, 10);
+
+  const templateId = await page.evaluate(
+    async ({ firstTitle, secondTitle, recurringTitle, yesterday }) => {
+      const skillsResponse = await fetch("/api/skills");
+      const skills = (await skillsResponse.json()) as {
+        skills: Array<{ id: string }>;
+      };
+      const skillId = skills.skills[0]?.id;
+      if (!skillId) throw new Error("No active skill for overdue E2E");
+      for (const title of [firstTitle, secondTitle]) {
+        const response = await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            title,
+            skillId,
+            localDate: yesterday,
+            baseXp: 20,
+            difficulty: "normal",
+          }),
+        });
+        if (!response.ok) throw new Error(`Task create failed: ${response.status}`);
+      }
+      const templateResponse = await fetch("/api/task-templates", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: recurringTitle,
+          skillId,
+          localDate: yesterday,
+          baseXp: 20,
+          difficulty: "normal",
+          recurrenceType: "daily",
+        }),
+      });
+      if (!templateResponse.ok) {
+        throw new Error(`Template create failed: ${templateResponse.status}`);
+      }
+      const created = (await templateResponse.json()) as {
+        template: { id: string };
+      };
+      return created.template.id;
+    },
+    { firstTitle, secondTitle, recurringTitle, yesterday },
+  );
+
+  await page.reload();
+  const overdue = page.locator("#overdue");
+  await expect(overdue.getByText(firstTitle, { exact: true })).toBeVisible();
+  await overdue.getByLabel(`Выбрать задачу ${firstTitle}`).click();
+  await overdue.getByLabel(`Выбрать задачу ${secondTitle}`).click();
+  await overdue.getByRole("button", { name: "Перенести", exact: true }).click();
+  await expect(page.getByText("Перенесено задач: 2")).toBeVisible();
+  await expect(overdue.getByText(firstTitle, { exact: true })).not.toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: firstTitle })).toBeVisible();
+
+  const recurringCard = overdue
+    .locator("[data-overdue-task]")
+    .filter({ hasText: recurringTitle });
+  await recurringCard.getByRole("button", { name: "Эта и будущие" }).click();
+  await page.getByRole("button", { name: "Подтвердить" }).click();
+  await expect(page.getByText("Повторение поставлено на паузу")).toBeVisible();
+  await expect(recurringCard).not.toBeVisible();
+
+  const templateActive = await page.evaluate(async (id) => {
+    const response = await fetch("/api/task-templates");
+    const data = (await response.json()) as {
+      templates: Array<{ id: string; isActive: boolean }>;
+    };
+    return data.templates.find((template) => template.id === id)?.isActive;
+  }, templateId);
+  expect(templateActive).toBe(false);
+});
+
 test("creates and customizes a skill before earning XP", async ({ page }) => {
   const title = `E2E навык ${Date.now()}`;
 
