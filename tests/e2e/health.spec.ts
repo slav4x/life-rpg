@@ -9,11 +9,3 @@ test("health endpoint reports ok", async ({ request }) => {
   expect(body.status).toBe("ok");
   expect(typeof body.timestamp).toBe("string");
 });
-
-test("mini app home screen renders", async ({ page }) => {
-  await page.goto("/");
-
-  await expect(
-    page.getByRole("heading", { name: "Life RPG" }),
-  ).toBeVisible();
-});

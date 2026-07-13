@@ -4,9 +4,10 @@
 развития: задачи, опыт, уровни, навыки, характеристики, квесты и достижения.
 Полная продуктовая и техническая спецификация — в [`SPEC.md`](./SPEC.md).
 
-> Статус: **Этап 5 — статистика и профиль**. Добавлены экраны навыков,
-> прогресса (график/фильтры) и профиля с темами, часовым поясом и экспортом
-> данных в JSON. Дальше — production readiness (см. [`TASKS.md`](./TASKS.md)).
+> Статус: **MVP готов** (Этап 6 — production readiness). Реализован весь игровой
+> цикл, статистика и профиль; добавлены security headers, отдельный шаг миграций,
+> бэкап PostgreSQL с проверенным восстановлением и E2E-тесты. Остаётся ручной
+> запуск через BotFather на своём сервере (см. [`TASKS.md`](./TASKS.md)).
 
 ## Стек
 
@@ -93,8 +94,9 @@ docker compose up -d
 ```
 
 Сервисы: `app` (Next.js standalone), `postgres` (17-alpine, наружу не
-публикуется), `caddy` (reverse proxy, HTTPS). Порт приложения проксируется
-через Caddy; PostgreSQL доступен только внутри сети compose.
+публикуется), `caddy` (reverse proxy, HTTPS) и одноразовый `migrate` (применяет
+миграции до старта `app`, чтобы инстансы не мигрировали конкурентно). Порт
+приложения проксируется через Caddy; PostgreSQL доступен только внутри сети compose.
 
 Проверить работоспособность контейнера напрямую:
 
@@ -103,6 +105,23 @@ docker build -t life-rpg .
 docker run --rm -p 3000:3000 -e SKIP_ENV_VALIDATION=1 life-rpg
 curl http://localhost:3000/api/health
 ```
+
+### Порядок деплоя (SPEC §16)
+
+1. Получить код на сервере, создать production `.env` (задать `APP_DOMAIN`, секреты).
+2. `docker compose build`.
+3. `docker compose up -d postgres` — поднять базу.
+4. `docker compose up -d` — сервис `migrate` применит миграции, затем поднимутся `app` и `caddy`.
+5. Проверить `/api/health` и вход из реального Telegram-клиента.
+6. Указать HTTPS URL Mini App в BotFather.
+
+### Бэкап и восстановление (SPEC §17)
+
+`scripts/backup.sh` делает `pg_dump -Fc` с ротацией 7 дневных / 4 недельных / 6 месячных
+копий; запускать systemd timer'ом или cron на хосте (минимум одна копия — off-site).
+`scripts/restore.sh <dump> [target-db]` восстанавливает дамп; для тестового восстановления
+указывайте **отдельную** целевую БД. Безопасность: `sessions` в экспорт не попадают,
+security headers добавляются в `next.config.ts` (framing не ограничивается ради Telegram).
 
 ## Конфигурация окружения
 

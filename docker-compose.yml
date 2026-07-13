@@ -1,4 +1,16 @@
 services:
+  # One-off migration step — runs to completion before the app starts, so no
+  # app instance migrates concurrently (SPEC §16).
+  migrate:
+    build:
+      context: .
+      target: migrator
+    restart: "no"
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   app:
     build: .
     restart: unless-stopped
@@ -6,6 +18,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     # Not published to the host: Caddy is the only public entry point.
     expose:
       - "3000"

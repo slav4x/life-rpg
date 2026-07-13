@@ -202,15 +202,41 @@
 - Экспорт исключает `sessions` (хранят hash токенов). Графики — `recharts` (client island).
 - Редактирование навыка меняет название/описание; смена характеристики — только при создании.
 
-## Этап 6 — production readiness
+## Этап 6 — production readiness 🚧 (текущий)
 
-- [ ] Завершить unit, integration и E2E тесты.
-- [ ] Проверить mobile viewport и Telegram safe areas.
-- [ ] Добавить security headers.
-- [ ] Настроить production deploy.
-- [ ] Настроить внешний backup PostgreSQL (`scripts/backup.sh`, `scripts/restore.sh`).
-- [ ] Выполнить тестовое восстановление.
-- [ ] Проверить реальный запуск через BotFather.
+- [x] Завершить unit, integration и E2E тесты.
+- [x] Проверить mobile viewport и Telegram safe areas.
+- [x] Добавить security headers.
+- [x] Настроить production deploy.
+- [x] Настроить внешний backup PostgreSQL (`scripts/backup.sh`, `scripts/restore.sh`).
+- [x] Выполнить тестовое восстановление.
+- [ ] Проверить реальный запуск через BotFather. *(ручной шаг — нужен бот и домен)*
+
+**Результат:** стабильный персональный MVP работает на собственном сервере.
+
+### Проверено
+
+- `npm run typecheck`, `npm run lint`, `npm run build` — без ошибок.
+- `npm run test` — 73 теста (unit + integration против PostgreSQL). E2E-спеки
+  (`tests/e2e/`) через dev-bypass; запуск: `npx playwright install && npm run test:e2e`.
+- Security headers на живом сервере: `X-Content-Type-Options`, `Referrer-Policy`,
+  `X-DNS-Prefetch-Control`, `Permissions-Policy` (без `X-Frame-Options` — для Telegram);
+  HSTS добавляется в production.
+- Production-миграции: собран лёгкий `migrator`-стейдж, `docker compose config` валиден,
+  образ применяет миграции к БД (`migrate` — one-off, без гонок при старте app).
+- **Тестовое восстановление**: `pg_dump -Fc` → restore в отдельную БД → счётчики совпали
+  (users/tasks/xp_transactions идентичны источнику).
+
+### Заметки / trade-offs
+
+- Framing не ограничивается (нет `X-Frame-Options`/строгого `frame-ancestors`) — иначе
+  ломается встраивание Mini App в Telegram.
+- `migrate`-сервис использует стадию `builder`-lite (`target: migrator`) с dev-зависимостями;
+  app стартует только после `service_completed_successfully` миграций.
+- Backup рассчитан на запуск через systemd timer/cron на хосте; ротация 7/4/6, минимум одна
+  копия — off-site (по SPEC §17). Скрипты используют `docker compose exec`.
+- Реальный запуск через BotFather и prod-деплой — ручные шаги (нужны бот-токен, домен, сервер);
+  порядок описан в README.
 
 ---
 

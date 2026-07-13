@@ -10,6 +10,16 @@ FROM base AS deps
 COPY package.json package-lock.json ./
 RUN npm ci
 
+# --- Migrator -------------------------------------------------------------
+# Lightweight image that applies Drizzle migrations as a one-off step, so the
+# app containers never migrate concurrently on start (SPEC §16).
+FROM base AS migrator
+ENV NODE_ENV=production
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json drizzle.config.ts ./
+COPY src/db ./src/db
+CMD ["npm", "run", "db:migrate"]
+
 # --- Build ----------------------------------------------------------------
 FROM base AS builder
 ENV NEXT_TELEMETRY_DISABLED=1
