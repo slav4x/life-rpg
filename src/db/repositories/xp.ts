@@ -1,8 +1,10 @@
-import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
 import {
   taskCompletions,
+  tasks,
+  quests,
   userAttributes,
   userSkills,
   xpTransactions,
@@ -29,6 +31,129 @@ export async function listRecentTransactions(
     .where(eq(xpTransactions.userId, userId))
     .orderBy(desc(xpTransactions.createdAt))
     .limit(limit);
+}
+
+export interface XpEvent {
+  id: string;
+  kind: "task" | "quest" | "reversal" | "adjustment";
+  title: string;
+  amount: number;
+  skillXp: number;
+  attributeXp: number;
+  localDate: string | null;
+  createdAt: string;
+}
+
+/** Group journal rows by their real-world source for human-readable history. */
+export async function listRecentXpEvents(
+  db: DbClient,
+  userId: string,
+  limit = 15,
+): Promise<XpEvent[]> {
+  const rows = await listRecentTransactions(db, userId, limit * 5);
+  if (rows.length === 0) return [];
+
+  const originalIds = rows.flatMap((row) =>
+    row.reversalOfId ? [row.reversalOfId] : [],
+  );
+  const originals =
+    originalIds.length > 0
+      ? await db
+          .select()
+          .from(xpTransactions)
+          .where(inArray(xpTransactions.id, originalIds))
+      : [];
+  const originalById = new Map(originals.map((row) => [row.id, row]));
+
+  const taskCompletionIds = new Set<string>();
+  const questIds = new Set<string>();
+  for (const row of rows) {
+    const source = row.reversalOfId
+      ? originalById.get(row.reversalOfId)
+      : row;
+    if (!source) continue;
+    if (source.sourceType === "task_completion") {
+      taskCompletionIds.add(source.sourceId);
+    } else if (source.sourceType === "quest_completion") {
+      questIds.add(source.sourceId);
+    }
+  }
+
+  const [taskSources, questSources] = await Promise.all([
+    taskCompletionIds.size > 0
+      ? db
+          .select({
+            completionId: taskCompletions.id,
+            title: tasks.title,
+            localDate: taskCompletions.localDate,
+          })
+          .from(taskCompletions)
+          .innerJoin(tasks, eq(tasks.id, taskCompletions.taskId))
+          .where(
+            and(
+              eq(taskCompletions.userId, userId),
+              inArray(taskCompletions.id, [...taskCompletionIds]),
+            ),
+          )
+      : Promise.resolve([]),
+    questIds.size > 0
+      ? db
+          .select({ id: quests.id, title: quests.title })
+          .from(quests)
+          .where(
+            and(eq(quests.userId, userId), inArray(quests.id, [...questIds])),
+          )
+      : Promise.resolve([]),
+  ]);
+
+  const taskByCompletion = new Map(
+    taskSources.map((row) => [row.completionId, row]),
+  );
+  const questById = new Map(questSources.map((row) => [row.id, row]));
+  const grouped = new Map<string, XpEvent>();
+
+  for (const row of rows) {
+    const original = row.reversalOfId
+      ? originalById.get(row.reversalOfId)
+      : undefined;
+    const sourceType = original?.sourceType ?? row.sourceType;
+    const sourceId = original?.sourceId ?? row.sourceId;
+    const isReversal = row.sourceType === "reversal";
+    const key = `${isReversal ? "reversal" : sourceType}:${sourceId}`;
+    const task =
+      sourceType === "task_completion"
+        ? taskByCompletion.get(sourceId)
+        : undefined;
+    const quest =
+      sourceType === "quest_completion" ? questById.get(sourceId) : undefined;
+
+    let event = grouped.get(key);
+    if (!event) {
+      event = {
+        id: key,
+        kind: isReversal
+          ? "reversal"
+          : sourceType === "task_completion"
+            ? "task"
+            : sourceType === "quest_completion"
+              ? "quest"
+              : "adjustment",
+        title: task?.title ?? quest?.title ?? "Корректировка XP",
+        amount: 0,
+        skillXp: 0,
+        attributeXp: 0,
+        localDate: task?.localDate ?? null,
+        createdAt: row.createdAt.toISOString(),
+      };
+      grouped.set(key, event);
+    }
+
+    if (row.scope === "global") event.amount += row.amount;
+    else if (row.scope === "skill") event.skillXp += row.amount;
+    else if (row.scope === "attribute") event.attributeXp += row.amount;
+  }
+
+  return [...grouped.values()].slice(0, limit);
 }
 
 export async function listSkillTransactions(

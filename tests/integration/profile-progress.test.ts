@@ -1,19 +1,27 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { exportUserData } from "@/application/profile/export";
+import {
+  importBackup,
+  importContentPack,
+} from "@/application/profile/import-data";
 import { getProfileData } from "@/application/profile/get-profile";
 import { updateUserProfile } from "@/application/profile/update-profile";
 import { getProgressData } from "@/application/progress/get-progress";
+import { completeQuest } from "@/application/quests/complete-quest";
 import { completeTask } from "@/application/tasks/complete-task";
 import { ensureAttributes, listAttributes } from "@/db/repositories/attributes";
+import { createSteps, setStepCompleted } from "@/db/repositories/quest-steps";
+import { createQuest } from "@/db/repositories/quests";
 import { createSkill } from "@/db/repositories/skills";
 import { createTask } from "@/db/repositories/tasks";
 import * as schema from "@/db/schema";
-import { users } from "@/db/schema";
+import { skills, users } from "@/db/schema";
+import { addDaysToDate } from "@/lib/dates/local-date";
 
 const url = process.env.TEST_DATABASE_URL;
 const today = new Intl.DateTimeFormat("en-CA", { timeZone: "UTC" }).format(
@@ -55,12 +63,12 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
     skillId = skill.id;
   });
 
-  async function completeOne(baseXp = 50) {
+  async function completeOne(baseXp = 50, localDate = today, title = "Задача") {
     const task = await createTask(db, {
       userId,
       skillId,
-      title: "Задача",
-      localDate: today,
+      title,
+      localDate,
       baseXp,
       difficulty: "normal",
     });
@@ -69,14 +77,41 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
 
   it("aggregates progress for the last 7 days", async () => {
     await completeOne(50);
+    await completeOne(100, addDaysToDate(today, -10), "Старая задача");
+
+    const quest = await createQuest(db, {
+      userId,
+      title: "Квест статистики",
+      type: "side",
+      rewardXp: 75,
+      status: "active",
+    });
+    await createSteps(db, quest.id, [
+      { title: "Шаг", isRequired: true, sortOrder: 0 },
+    ]);
+    const [step] = await db
+      .select()
+      .from(schema.questSteps)
+      .where(eq(schema.questSteps.questId, quest.id));
+    await setStepCompleted(db, step.id, new Date());
+    await completeQuest({ userId, questId: quest.id }, db);
 
     const data = await getProgressData(userId, "7d", "UTC", db);
 
-    expect(data.totalXp).toBe(50);
+    expect(data.totalXp).toBe(125);
     expect(data.completedTasks).toBe(1);
     expect(data.daily).toHaveLength(7);
-    expect(data.daily.at(-1)).toEqual({ date: today, xp: 50 });
+    expect(data.daily.at(-1)).toEqual({ date: today, xp: 125 });
     expect(data.attributes.find((a) => a.code === "mind")?.xp).toBe(13);
+    expect(data.recent.find((event) => event.title === "Задача")).toMatchObject({
+      kind: "task",
+      amount: 50,
+      skillXp: 50,
+      attributeXp: 13,
+    });
+    expect(
+      data.recent.find((event) => event.title === "Квест статистики"),
+    ).toMatchObject({ kind: "quest", amount: 75 });
   });
 
   it("returns the profile with all attributes and achievements", async () => {
@@ -94,8 +129,90 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
     const parsed = JSON.parse(json);
 
     expect(parsed.user.telegramId).toBe("740000001");
+    expect(parsed.format).toBe("life-rpg-export");
+    expect(parsed.formatVersion).toBe(1);
+    expect(parsed.attributes).toHaveLength(6);
+    expect(parsed.achievementCatalog).toHaveLength(8);
     expect(parsed.tasks.length).toBeGreaterThanOrEqual(1);
     expect(parsed.xpTransactions.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("imports a content pack idempotently and rejects changed duplicates", async () => {
+    const pack = {
+      format: "life-rpg-content-pack",
+      formatVersion: 1,
+      name: "Тестовый пак",
+      skills: [
+        {
+          key: "reading",
+          name: "Чтение книг",
+          attributeCode: "mind",
+          icon: "📚",
+          color: "#6366F1",
+        },
+      ],
+      taskTemplates: [
+        {
+          title: "Читать 20 минут",
+          skillKey: "reading",
+          baseXp: 20,
+          difficulty: "easy",
+          recurrenceType: "daily",
+        },
+      ],
+      quests: [
+        {
+          title: "Прочитать книгу",
+          type: "side",
+          attributeCode: "mind",
+          rewardXp: 100,
+          steps: [{ title: "Выбрать книгу" }, { title: "Дочитать" }],
+        },
+      ],
+    };
+
+    const first = await importContentPack(userId, pack, db);
+    expect(first.created).toEqual({ skills: 1, taskTemplates: 1, quests: 1 });
+
+    const second = await importContentPack(userId, pack, db);
+    expect(second.created).toEqual({ skills: 0, taskTemplates: 0, quests: 0 });
+    expect(second.skipped).toEqual({ skills: 1, taskTemplates: 1, quests: 1 });
+
+    await expect(
+      importContentPack(
+        userId,
+        {
+          ...pack,
+          skills: [{ ...pack.skills[0], attributeCode: "body" }],
+        },
+        db,
+      ),
+    ).rejects.toMatchObject({ code: "conflict" });
+  });
+
+  it("restores a versioned export only with explicit replacement", async () => {
+    await completeOne(50);
+    const backup = JSON.parse(JSON.stringify(await exportUserData(userId, db)));
+    const attrs = await listAttributes(db);
+    await createSkill(db, {
+      userId,
+      attributeId: attrs.find((attribute) => attribute.code === "body")!.id,
+      name: "После экспорта",
+    });
+
+    await expect(importBackup(userId, backup, false, db)).rejects.toMatchObject({
+      code: "account_not_empty",
+    });
+    await importBackup(userId, backup, true, db);
+
+    const restoredSkills = await db
+      .select()
+      .from(skills)
+      .where(eq(skills.userId, userId));
+    expect(restoredSkills.map((skill) => skill.name)).not.toContain(
+      "После экспорта",
+    );
+    expect((await getProgressData(userId, "all", "UTC", db)).totalXp).toBe(50);
   });
 
   it("rejects an invalid timezone", async () => {

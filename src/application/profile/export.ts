@@ -22,7 +22,9 @@ export async function exportUserData(
     xpTransactions,
     quests,
     streaks,
-    achievements,
+    userAchievements,
+    attributes,
+    achievementCatalog,
   ] = await Promise.all([
     db.select().from(schema.users).where(eq(schema.users.id, userId)),
     db.select().from(schema.skills).where(eq(schema.skills.userId, userId)),
@@ -50,6 +52,8 @@ export async function exportUserData(
       .select()
       .from(schema.userAchievements)
       .where(eq(schema.userAchievements.userId, userId)),
+    db.select().from(schema.attributes),
+    db.select().from(schema.achievements),
   ]);
 
   const questIds = quests.map((q) => q.id);
@@ -66,8 +70,18 @@ export async function exportUserData(
     : null;
 
   return {
+    format: "life-rpg-export",
+    formatVersion: 1,
     exportedAt: new Date().toISOString(),
     user,
+    attributes: attributes.map((attribute) => ({
+      id: attribute.id,
+      code: attribute.code,
+    })),
+    achievementCatalog: achievementCatalog.map((achievement) => ({
+      id: achievement.id,
+      code: achievement.code,
+    })),
     skills,
     userSkills,
     userAttributes,
@@ -78,6 +92,6 @@ export async function exportUserData(
     quests,
     questSteps,
     streaks,
-    userAchievements: achievements,
+    userAchievements,
   };
 }

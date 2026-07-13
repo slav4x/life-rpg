@@ -8,7 +8,7 @@ import {
 } from "@/db/repositories/progress";
 import { listStreaks } from "@/db/repositories/streaks";
 import { listTemplates } from "@/db/repositories/task-templates";
-import { listRecentTransactions } from "@/db/repositories/xp";
+import { listRecentXpEvents, type XpEvent } from "@/db/repositories/xp";
 import { displayCurrentStreak } from "@/domain/game/streak";
 import { addDaysToDate, getLocalDate } from "@/lib/dates/local-date";
 
@@ -22,13 +22,6 @@ export function isProgressPeriod(value: string): value is ProgressPeriod {
 // period totals are computed from the full data, not this window.
 const CHART_MAX_DAYS = 90;
 
-export interface ProgressTransaction {
-  amount: number;
-  scope: string;
-  sourceType: string;
-  createdAt: string;
-}
-
 export interface ProgressData {
   period: ProgressPeriod;
   totalXp: number;
@@ -36,7 +29,7 @@ export interface ProgressData {
   streak: { current: number; best: number };
   daily: DailyXp[];
   attributes: AttributeXp[];
-  recent: ProgressTransaction[];
+  recent: XpEvent[];
 }
 
 function laterDate(a: string, b: string): string {
@@ -70,10 +63,10 @@ export async function getProgressData(
 
   const [dailyRaw, completedTasks, attributes, recent, streaks, templates] =
     await Promise.all([
-      xpByLocalDate(db, userId, from),
+      xpByLocalDate(db, userId, timezone, from),
       countCompletionsFrom(db, userId, from),
-      attributeDistribution(db, userId),
-      listRecentTransactions(db, userId, 15),
+      attributeDistribution(db, userId, from),
+      listRecentXpEvents(db, userId, 15),
       listStreaks(db, userId),
       listTemplates(db, userId),
     ]);
@@ -113,11 +106,6 @@ export async function getProgressData(
     streak: { current: currentStreak, best: bestStreak },
     daily,
     attributes,
-    recent: recent.map((t) => ({
-      amount: t.amount,
-      scope: t.scope,
-      sourceType: t.sourceType,
-      createdAt: t.createdAt.toISOString(),
-    })),
+    recent,
   };
 }

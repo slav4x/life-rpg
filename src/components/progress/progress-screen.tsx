@@ -15,12 +15,22 @@ const PERIODS: { value: ProgressPeriod; label: string }[] = [
   { value: "all", label: "Всё время" },
 ];
 
-function scopeLabel(scope: string, sourceType: string): string {
-  if (sourceType === "reversal") return "Отмена";
-  if (sourceType === "quest_completion") return "Квест";
-  if (scope === "skill") return "Навык";
-  if (scope === "attribute") return "Характеристика";
-  return "Общий";
+function eventLabel(kind: ProgressData["recent"][number]["kind"]): string {
+  if (kind === "reversal") return "Отмена действия";
+  if (kind === "quest") return "Квест";
+  if (kind === "task") return "Действие";
+  return "Корректировка";
+}
+
+function eventDate(localDate: string | null, createdAt: string): string {
+  const date = localDate
+    ? new Date(`${localDate}T00:00:00`)
+    : new Date(createdAt);
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
 }
 
 function Stat({ label, value }: { label: string; value: string | number }) {
@@ -57,7 +67,7 @@ export function ProgressScreen({ data }: { data: ProgressData }) {
       </div>
 
       <div className="grid grid-cols-3 gap-2">
-        <Stat label="XP за период" value={data.totalXp} />
+        <Stat label="XP: задачи + квесты" value={data.totalXp} />
         <Stat label="Задачи" value={data.completedTasks} />
         <Stat
           label="Серия тек./рекорд"
@@ -71,7 +81,7 @@ export function ProgressScreen({ data }: { data: ProgressData }) {
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium">По характеристикам</h2>
+        <h2 className="text-sm font-medium">По характеристикам за период</h2>
         <div className="flex flex-col gap-2">
           {data.attributes.map((a) => (
             <div key={a.code} className="flex flex-col gap-1">
@@ -86,22 +96,36 @@ export function ProgressScreen({ data }: { data: ProgressData }) {
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium">Последние начисления</h2>
+        <h2 className="text-sm font-medium">Последние события XP</h2>
         {data.recent.length === 0 ? (
           <p className="text-sm text-muted-foreground">Пока нет начислений.</p>
         ) : (
           <ul className="flex flex-col gap-1.5">
-            {data.recent.map((t, i) => (
+            {data.recent.map((event) => (
               <li
-                key={i}
-                className="flex items-center justify-between rounded-lg border bg-card px-3 py-2 text-sm"
+                key={event.id}
+                className="flex items-start justify-between gap-3 rounded-lg border bg-card px-3 py-2.5 text-sm"
               >
-                <span className="text-muted-foreground">
-                  {scopeLabel(t.scope, t.sourceType)}
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{event.title}</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {eventLabel(event.kind)} · {eventDate(event.localDate, event.createdAt)}
+                  </span>
+                  {(event.skillXp !== 0 || event.attributeXp !== 0) && (
+                    <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                      Навык {event.skillXp > 0 ? "+" : ""}{event.skillXp} · характеристика{" "}
+                      {event.attributeXp > 0 ? "+" : ""}{event.attributeXp} XP
+                    </span>
+                  )}
                 </span>
-                <span className={t.amount < 0 ? "text-destructive" : ""}>
-                  {t.amount > 0 ? "+" : ""}
-                  {t.amount} XP
+                <span
+                  className={cn(
+                    "shrink-0 font-medium",
+                    event.amount < 0 && "text-destructive",
+                  )}
+                >
+                  {event.amount > 0 ? "+" : ""}
+                  {event.amount} XP
                 </span>
               </li>
             ))}

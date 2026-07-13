@@ -1,9 +1,9 @@
 "use client";
 
-import { Download, LogOut, Pencil } from "lucide-react";
+import { Download, LogOut, Pencil, Upload } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { type ChangeEvent, useState } from "react";
 import { toast } from "sonner";
 
 import type {
@@ -130,6 +130,85 @@ export function ProfileSettings({
     }
   }
 
+  async function importFile(
+    kind: "backup" | "content_pack",
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Файл больше 10 МБ");
+      event.target.value = "";
+      return;
+    }
+
+    setBusy(true);
+    try {
+      let data: unknown;
+      try {
+        data = JSON.parse(await file.text());
+      } catch {
+        toast.error("Файл не является корректным JSON");
+        return;
+      }
+
+      async function send(replace = false) {
+        return fetch("/api/import", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ kind, replace, data }),
+        });
+      }
+
+      let response = await send();
+      let result: {
+        error?: string;
+        conflicts?: string[];
+        summary?: {
+          created: { skills: number; taskTemplates: number; quests: number };
+          skipped: { skills: number; taskTemplates: number; quests: number };
+        };
+      } = await response.json();
+
+      if (
+        kind === "backup" &&
+        response.status === 409 &&
+        result.error === "account_not_empty"
+      ) {
+        const confirmed = window.confirm(
+          "Восстановление экспорта заменит текущие навыки, задачи, квесты и прогресс. Продолжить?",
+        );
+        if (!confirmed) return;
+        response = await send(true);
+        result = await response.json();
+      }
+
+      if (!response.ok || !result.summary) {
+        toast.error("Импорт остановлен", {
+          description:
+            result.conflicts?.slice(0, 3).join("; ") ??
+            "Проверьте формат и версию файла.",
+        });
+        return;
+      }
+
+      const created = result.summary.created;
+      const skipped = Object.values(result.summary.skipped).reduce(
+        (sum, value) => sum + value,
+        0,
+      );
+      toast.success("Данные импортированы", {
+        description: `Навыки: ${created.skills}, повторения: ${created.taskTemplates}, квесты: ${created.quests}${skipped ? ` · без изменений: ${skipped}` : ""}`,
+      });
+      router.refresh();
+    } catch {
+      toast.error("Не удалось импортировать файл");
+    } finally {
+      setBusy(false);
+      event.target.value = "";
+    }
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <section className="flex flex-col gap-2">
@@ -243,6 +322,38 @@ export function ProfileSettings({
             Экспорт в JSON
           </Button>
         </a>
+        <input
+          id="backup-import"
+          type="file"
+          accept="application/json,.json"
+          className="sr-only"
+          disabled={busy}
+          onChange={(event) => importFile("backup", event)}
+        />
+        <Button asChild variant="outline" className="w-full">
+          <label htmlFor="backup-import">
+            <Upload className="size-4" />
+            Восстановить из экспорта
+          </label>
+        </Button>
+        <input
+          id="content-pack-import"
+          type="file"
+          accept="application/json,.json"
+          className="sr-only"
+          disabled={busy}
+          onChange={(event) => importFile("content_pack", event)}
+        />
+        <Button asChild variant="outline" className="w-full">
+          <label htmlFor="content-pack-import">
+            <Upload className="size-4" />
+            Импортировать контент-пак
+          </label>
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          Экспорт восстанавливает все данные с заменой. Контент-пак добавляет
+          навыки, повторения и квесты без частичного импорта при конфликтах.
+        </p>
         <Button
           variant="ghost"
           className="text-destructive"

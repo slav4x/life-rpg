@@ -56,6 +56,9 @@ test("creates a one-off action", async ({ page }) => {
     page.getByText("Уже открытые достижения останутся полученными."),
   ).toBeVisible();
   await page.getByRole("button", { name: "Назад" }).click();
+  await page.getByRole("link", { name: "Прогресс" }).click();
+  await expect(page.getByText(title)).toBeVisible();
+  await expect(page.getByText(/^Действие ·/).first()).toBeVisible();
 });
 
 test("creates and customizes a skill before earning XP", async ({ page }) => {
@@ -82,6 +85,74 @@ test("creates and customizes a skill before earning XP", async ({ page }) => {
   await editDialog.getByRole("button", { name: "Сохранить" }).click();
 
   await expect(page.getByText("Разум", { exact: true })).toBeVisible();
+});
+
+test("imports a content pack and reports conflicts", async ({ page }) => {
+  const suffix = Date.now();
+  const skillName = `E2E контент ${suffix}`;
+  const questTitle = `E2E цель ${suffix}`;
+  const pack = {
+    format: "life-rpg-content-pack",
+    formatVersion: 1,
+    name: `E2E пак ${suffix}`,
+    skills: [
+      {
+        key: `content-${suffix}`,
+        name: skillName,
+        attributeCode: "discipline",
+        icon: "⚡",
+        color: "#F59E0B",
+      },
+    ],
+    taskTemplates: [
+      {
+        title: `E2E повторение ${suffix}`,
+        skillKey: `content-${suffix}`,
+        baseXp: 20,
+        difficulty: "normal",
+        recurrenceType: "daily",
+      },
+    ],
+    quests: [
+      {
+        title: questTitle,
+        type: "side",
+        attributeCode: "discipline",
+        rewardXp: 100,
+        steps: [{ title: "Сделать первый шаг" }],
+      },
+    ],
+  };
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Привет/ })).toBeVisible({
+    timeout: 15000,
+  });
+  await page.getByRole("link", { name: "Профиль" }).click();
+  await expect(page.getByRole("heading", { name: "Характеристики" })).toBeVisible({
+    timeout: 15000,
+  });
+  await page.locator("#content-pack-import").setInputFiles({
+    name: "content-pack.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(pack)),
+  });
+  await expect(page.getByText("Данные импортированы")).toBeVisible();
+
+  await page.getByRole("link", { name: "Навыки" }).click();
+  await expect(page.getByText(skillName)).toBeVisible();
+  await page.getByRole("link", { name: "Профиль" }).click();
+  await page.locator("#content-pack-import").setInputFiles({
+    name: "content-pack-conflict.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        ...pack,
+        skills: [{ ...pack.skills[0], attributeCode: "body" }],
+      }),
+    ),
+  });
+  await expect(page.getByText("Импорт остановлен")).toBeVisible();
 });
 
 test("creates, edits, archives and links a quest step to a task", async ({ page }) => {
