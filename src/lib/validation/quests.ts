@@ -26,6 +26,7 @@ export const createQuestInputSchema = z
     title: z.string().min(1).max(200),
     description: z.string().max(2000).optional(),
     type: questType,
+    status: z.enum(["draft", "active"]).optional(),
     attributeId: z.uuid().nullish(),
     rewardXp: z.number().int().min(0).max(10000),
     dueDate: isoDateSchema.nullish(),

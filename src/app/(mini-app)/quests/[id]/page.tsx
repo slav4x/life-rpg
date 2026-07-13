@@ -72,6 +72,7 @@ export default async function QuestPage({
         attributeName: attribute?.name ?? null,
         dueDate: quest.dueDate,
         manualCompletion: quest.manualCompletion,
+        completedAt: quest.completedAt?.toISOString() ?? null,
       }}
       steps={stepVMs}
       attributes={attributes.map((item) => ({ id: item.id, name: item.name }))}

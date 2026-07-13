@@ -11,6 +11,7 @@ export interface CreateQuestCommand {
   title: string;
   description?: string;
   type: string;
+  status?: "draft" | "active";
   attributeId?: string | null;
   rewardXp: number;
   dueDate?: string | null;
@@ -43,7 +44,7 @@ export async function createUserQuest(
       rewardXp: cmd.rewardXp,
       dueDate: cmd.dueDate ?? null,
       manualCompletion: cmd.manualCompletion ?? true,
-      status: "active",
+      status: cmd.status ?? "active",
     });
 
     await createSteps(

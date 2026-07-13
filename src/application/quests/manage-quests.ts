@@ -100,16 +100,20 @@ export async function updateUserQuest(
     if (!current) throw new GameError("quest_not_found", "Quest not found");
 
     const { steps, ...fields } = input;
-    if (current.status === "completed") {
+    const hasExtraFields = Object.entries(fields).some(
+      ([key, value]) => key !== "status" && value !== undefined,
+    );
+    if (
+      current.status === "completed" &&
+      (fields.status !== "archived" || steps !== undefined || hasExtraFields)
+    ) {
       throw new GameError("quest_not_active", "Completed quest cannot be changed");
     }
     if (
       current.status === "archived" &&
       (fields.status !== "active" ||
         steps !== undefined ||
-        Object.entries(fields).some(
-          ([key, value]) => key !== "status" && value !== undefined,
-        ))
+        hasExtraFields)
     ) {
       throw new GameError("quest_not_active", "Restore quest before editing");
     }
@@ -127,7 +131,11 @@ export async function updateUserQuest(
 
     let quest = current;
     if (Object.values(fields).some((value) => value !== undefined)) {
-      quest = (await updateQuest(tx, userId, id, fields)) ?? current;
+      const nextFields =
+        current.status === "archived" && current.completedAt && fields.status === "active"
+          ? { ...fields, status: "completed" }
+          : fields;
+      quest = (await updateQuest(tx, userId, id, nextFields)) ?? current;
     }
     if (steps) {
       try {

@@ -44,4 +44,20 @@ describe("quest validation", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("allows creating drafts but rejects completed quests in create API", () => {
+    const input = {
+      title: "Квест",
+      type: "main",
+      rewardXp: 250,
+      steps: [{ title: "Шаг" }],
+    };
+
+    expect(
+      createQuestInputSchema.safeParse({ ...input, status: "draft" }).success,
+    ).toBe(true);
+    expect(
+      createQuestInputSchema.safeParse({ ...input, status: "completed" }).success,
+    ).toBe(false);
+  });
 });

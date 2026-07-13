@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
 import { quests, type Quest } from "@/db/schema";
@@ -129,6 +129,6 @@ export async function countCompletedQuests(
   const rows = await db
     .select({ id: quests.id })
     .from(quests)
-    .where(and(eq(quests.userId, userId), eq(quests.status, "completed")));
+    .where(and(eq(quests.userId, userId), isNotNull(quests.completedAt)));
   return rows.length;
 }

@@ -11,6 +11,7 @@ export interface QuestVM {
   percent: number;
   attributeName: string | null;
   dueDate: string | null;
+  completedAt: string | null;
 }
 
 export interface StepVM {
@@ -37,6 +38,7 @@ export interface QuestDetailVM {
   attributeName: string | null;
   dueDate: string | null;
   manualCompletion: boolean;
+  completedAt: string | null;
 }
 
 export interface QuestAttributeOption {

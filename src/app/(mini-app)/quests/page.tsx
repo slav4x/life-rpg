@@ -5,6 +5,7 @@ import {
 } from "@/application/quests/manage-quests";
 import { QuestsScreen } from "@/components/quests/quests-screen";
 import type { QuestVM } from "@/components/quests/types";
+import { getLocalDate } from "@/lib/dates/local-date";
 
 export default async function QuestsPage() {
   const user = await getAuthenticatedUser();
@@ -39,12 +40,14 @@ export default async function QuestsPage() {
         : Math.round((requiredCompleted / requiredTotal) * 100),
     attributeName: attribute?.name ?? null,
     dueDate: quest.dueDate,
+    completedAt: quest.completedAt?.toISOString() ?? null,
   }),
   );
 
   return (
     <QuestsScreen
       quests={quests}
+      today={getLocalDate(user.timezone)}
       attributes={attributes.map((attribute) => ({
         id: attribute.id,
         name: attribute.name,

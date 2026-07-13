@@ -247,6 +247,36 @@ test("creates, edits, archives and links a quest step to a task", async ({ page 
   await expect(page.getByRole("button", { name: "Изменить" })).toBeVisible();
 });
 
+test("saves, filters and activates an overdue quest draft", async ({ page }) => {
+  const title = `E2E черновик ${Date.now()}`;
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Привет/ })).toBeVisible({
+    timeout: 15000,
+  });
+  await page.getByRole("link", { name: "Квесты" }).click();
+  await page.getByRole("button", { name: "Квест" }).click();
+  await page.getByLabel("Название").fill(title);
+  await page.getByPlaceholder("Название шага").fill("Запустить черновик");
+  await page.getByLabel("Дедлайн").fill("2020-01-01");
+  await page.getByRole("button", { name: "В черновики" }).click();
+
+  const card = page.getByRole("link", { name: new RegExp(title) });
+  await expect(card.getByText("Черновик", { exact: true })).toBeVisible();
+  await card.click();
+  await page.getByRole("button", { name: "Активировать" }).click();
+  await expect(page.getByText("Просрочен · дедлайн: 01.01.2020")).toBeVisible();
+  await expect(
+    page.getByText("Просроченный квест остаётся доступным для завершения."),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Квесты" }).click();
+  await page.getByLabel("Тип").click();
+  await page.getByRole("option", { name: "Основной" }).click();
+  await page.getByRole("tab", { name: "Завершённые" }).click();
+  await expect(page).toHaveURL(/\/quests\?tab=completed&type=main$/);
+});
+
 test("offers the full IANA timezone list and rolls theme back on API failure", async ({
   page,
 }) => {

@@ -6,6 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { completeTask } from "@/application/tasks/complete-task";
 import { completeQuest } from "@/application/quests/complete-quest";
+import { createUserQuest } from "@/application/quests/create-quest";
 import { revertQuest } from "@/application/quests/revert-quest";
 import { updateUserQuest } from "@/application/quests/manage-quests";
 import { toggleStep } from "@/application/quests/toggle-step";
@@ -13,7 +14,7 @@ import { createOneOffTask } from "@/application/tasks/create-task";
 import { ensureAttributes, listAttributes } from "@/db/repositories/attributes";
 import { listUserAchievements } from "@/db/repositories/achievements";
 import { createSteps, listSteps } from "@/db/repositories/quest-steps";
-import { createQuest } from "@/db/repositories/quests";
+import { countCompletedQuests, createQuest } from "@/db/repositories/quests";
 import { createSkill } from "@/db/repositories/skills";
 import { createTask } from "@/db/repositories/tasks";
 import { sumGlobalXp } from "@/db/repositories/xp";
@@ -237,6 +238,60 @@ describe.skipIf(!url)("quests & achievements (integration)", () => {
       db,
     );
     expect(restored.quest.status).toBe("active");
+  });
+
+  it("creates a draft and activates it without losing its steps", async () => {
+    const draft = await createUserQuest(
+      {
+        userId,
+        title: "Черновик",
+        type: "long_term",
+        status: "draft",
+        rewardXp: 500,
+        steps: [{ title: "Первый шаг" }],
+      },
+      db,
+    );
+
+    expect(draft.status).toBe("draft");
+    const activated = await updateUserQuest(
+      userId,
+      draft.id,
+      { status: "active" },
+      db,
+    );
+
+    expect(activated.quest.status).toBe("active");
+    expect((await listSteps(db, draft.id)).map((step) => step.title)).toEqual([
+      "Первый шаг",
+    ]);
+  });
+
+  it("archives a completed quest and restores it with history and XP intact", async () => {
+    const quest = await activeQuest(180);
+    await completeAllSteps(quest.id);
+    await completeQuest({ userId, questId: quest.id }, db);
+
+    const archived = await updateUserQuest(
+      userId,
+      quest.id,
+      { status: "archived" },
+      db,
+    );
+    expect(archived.quest.status).toBe("archived");
+    expect(archived.quest.completedAt).not.toBeNull();
+    expect(await countCompletedQuests(db, userId)).toBe(1);
+    expect(await sumGlobalXp(db, userId)).toBe(180);
+
+    const restored = await updateUserQuest(
+      userId,
+      quest.id,
+      { status: "active" },
+      db,
+    );
+    expect(restored.quest.status).toBe("completed");
+    expect(restored.quest.completedAt).toEqual(archived.quest.completedAt);
+    expect(await sumGlobalXp(db, userId)).toBe(180);
   });
 
   it("auto-completes when editing a fully-done manual quest to automatic", async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, ArrowLeft, CalendarPlus, RotateCcw } from "lucide-react";
+import { Archive, ArrowLeft, CalendarPlus, Play, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -67,8 +67,11 @@ export function QuestDetail({
     : 0;
   const allRequiredDone = requiredSteps.every((step) => step.completed);
   const isActive = quest.status === "active";
+  const isDraft = quest.status === "draft";
   const isCompleted = quest.status === "completed";
   const isArchived = quest.status === "archived";
+  const wasCompleted = quest.completedAt !== null;
+  const overdue = isActive && Boolean(quest.dueDate) && quest.dueDate! < today;
   const defaultSkill = quest.attributeId
     ? skills.find((skill) => skill.attributeId === quest.attributeId)
     : undefined;
@@ -146,7 +149,16 @@ export function QuestDetail({
         );
         return;
       }
-      toast.success(status === "archived" ? "Квест архивирован" : "Квест возвращён");
+      const data: { quest: { status: string } } = await res.json();
+      toast.success(
+        status === "archived"
+          ? "Квест архивирован"
+          : isDraft
+            ? "Квест активирован"
+            : data.quest.status === "completed"
+              ? "Квест возвращён в завершённые"
+              : "Квест возвращён в активные",
+      );
       router.refresh();
     } catch {
       toast.error(NETWORK_ERROR_MESSAGE);
@@ -198,6 +210,16 @@ export function QuestDetail({
             <Badge variant="secondary" className="font-normal">
               {typeLabel(quest.type)}
             </Badge>
+            {isDraft && (
+              <Badge variant="outline" className="font-normal">
+                Черновик
+              </Badge>
+            )}
+            {isArchived && wasCompleted && (
+              <Badge variant="outline" className="font-normal">
+                Завершён
+              </Badge>
+            )}
           </div>
         </div>
         {quest.description && (
@@ -213,33 +235,52 @@ export function QuestDetail({
           {quest.rewardXp > 0 && <span>Награда: {quest.rewardXp} XP</span>}
         </div>
         {quest.dueDate && (
+          <p
+            className={cn(
+              "text-xs text-muted-foreground",
+              overdue && "font-medium text-destructive",
+            )}
+          >
+            {overdue ? "Просрочен · дедлайн: " : "Дедлайн: "}
+            {formatDate(quest.dueDate)}
+          </p>
+        )}
+        {overdue && (
           <p className="text-xs text-muted-foreground">
-            Дедлайн: {formatDate(quest.dueDate)}
+            Просроченный квест остаётся доступным для завершения.
           </p>
         )}
         {steps.length > 0 && <Progress value={percent} />}
 
-        {(isActive || quest.status === "draft") && (
+        {(isActive || isDraft || isCompleted) && (
           <div className="flex flex-wrap gap-2">
-            <QuestFormDrawer
-              attributes={attributes}
-              quest={{
-                id: quest.id,
-                title: quest.title,
-                description: quest.description,
-                type: quest.type,
-                rewardXp: quest.rewardXp,
-                attributeId: quest.attributeId,
-                dueDate: quest.dueDate,
-                manualCompletion: quest.manualCompletion,
-                steps: steps.map((step) => ({
-                  id: step.id,
-                  title: step.title,
-                  description: step.description,
-                  isRequired: step.isRequired,
-                })),
-              }}
-            />
+            {(isActive || isDraft) && (
+              <QuestFormDrawer
+                attributes={attributes}
+                quest={{
+                  id: quest.id,
+                  title: quest.title,
+                  description: quest.description,
+                  type: quest.type,
+                  rewardXp: quest.rewardXp,
+                  attributeId: quest.attributeId,
+                  dueDate: quest.dueDate,
+                  manualCompletion: quest.manualCompletion,
+                  steps: steps.map((step) => ({
+                    id: step.id,
+                    title: step.title,
+                    description: step.description,
+                    isRequired: step.isRequired,
+                  })),
+                }}
+              />
+            )}
+            {isDraft && (
+              <Button size="sm" disabled={busy} onClick={() => changeStatus("active")}>
+                <Play className="size-4" />
+                Активировать
+              </Button>
+            )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button size="sm" variant="ghost" disabled={busy}>
@@ -274,7 +315,7 @@ export function QuestDetail({
             onClick={() => changeStatus("active")}
           >
             <RotateCcw className="size-4" />
-            Вернуть в активные
+            {wasCompleted ? "Вернуть в завершённые" : "Вернуть в активные"}
           </Button>
         )}
       </header>
@@ -365,6 +406,10 @@ export function QuestDetail({
         </AlertDialog>
       ) : isArchived ? (
         <p className="text-sm text-muted-foreground">Квест находится в архиве.</p>
+      ) : isDraft ? (
+        <p className="text-sm text-muted-foreground">
+          Активируйте черновик, чтобы отмечать шаги и завершить квест.
+        </p>
       ) : !quest.manualCompletion && !allRequiredDone ? (
         <p className="text-sm text-muted-foreground">
           Квест завершится автоматически после выполнения обязательных шагов.

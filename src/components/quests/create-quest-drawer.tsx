@@ -146,7 +146,7 @@ export function QuestFormDrawer({
     setSteps([initialStep(`new-${nextStepKey.current++}`)]);
   }
 
-  async function submit() {
+  async function submit(createStatus: "draft" | "active" = "active") {
     const cleanTitle = title.trim();
     const reward = Math.round(Number(rewardXp));
     const cleanSteps = steps.map((step) => ({
@@ -181,6 +181,7 @@ export function QuestFormDrawer({
         body: JSON.stringify({
           title: cleanTitle,
           type,
+          ...(!isEdit ? { status: createStatus } : {}),
           rewardXp: reward,
           attributeId: attributeId === "none" ? null : attributeId,
           dueDate: dueDate || null,
@@ -212,7 +213,13 @@ export function QuestFormDrawer({
         toast.success(`Квест завершён! +${result.questCompleted.rewardXp} XP`);
         showAchievementToasts(result.questCompleted.unlockedAchievements);
       } else {
-        toast.success(isEdit ? "Квест обновлён" : "Квест создан");
+        toast.success(
+          isEdit
+            ? "Квест обновлён"
+            : createStatus === "draft"
+              ? "Черновик сохранён"
+              : "Квест создан",
+        );
       }
       setOpen(false);
       if (!isEdit) resetCreateForm();
@@ -426,13 +433,24 @@ export function QuestFormDrawer({
           </div>
 
           <DrawerFooter>
-            <Button onClick={submit} disabled={submitting}>
-              {submitting
-                ? "Сохранение…"
-                : isEdit
-                  ? "Сохранить"
-                  : "Создать квест"}
-            </Button>
+            {isEdit ? (
+              <Button onClick={() => submit()} disabled={submitting}>
+                {submitting ? "Сохранение…" : "Сохранить"}
+              </Button>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => submit("draft")}
+                  disabled={submitting}
+                >
+                  В черновики
+                </Button>
+                <Button onClick={() => submit("active")} disabled={submitting}>
+                  {submitting ? "Сохранение…" : "Создать квест"}
+                </Button>
+              </div>
+            )}
             <DrawerClose asChild>
               <Button variant="outline">Отмена</Button>
             </DrawerClose>
