@@ -13,6 +13,8 @@ export interface CreateTemplateInput {
   recurrenceType: string;
   weekdays?: number[] | null;
   estimatedMinutes?: number | null;
+  startsOn?: string;
+  endsOn?: string | null;
 }
 
 export async function createTemplate(
@@ -31,6 +33,10 @@ export async function createTemplate(
       recurrenceType: input.recurrenceType,
       weekdays: input.weekdays ?? null,
       estimatedMinutes: input.estimatedMinutes ?? null,
+      // Application flows always pass the user's local start date. The fallback
+      // preserves the historical low-level repository behaviour for fixtures.
+      startsOn: input.startsOn ?? "1970-01-01",
+      endsOn: input.endsOn ?? null,
     })
     .returning();
   return template;
@@ -87,6 +93,8 @@ export interface UpdateTemplateFields {
   recurrenceType?: string;
   weekdays?: number[] | null;
   estimatedMinutes?: number | null;
+  startsOn?: string;
+  endsOn?: string | null;
   isActive?: boolean;
 }
 

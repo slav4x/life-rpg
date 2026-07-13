@@ -16,10 +16,15 @@ export const createTemplateInputSchema = z
     weekdays: weekdays.optional(),
     estimatedMinutes: estimatedMinutesSchema.optional(),
     localDate: isoDateSchema,
+    endsOn: isoDateSchema.optional(),
   })
   .refine((v) => v.recurrenceType !== "weekdays" || Boolean(v.weekdays), {
     message: "weekdays are required for the weekdays recurrence",
     path: ["weekdays"],
+  })
+  .refine((v) => !v.endsOn || v.endsOn >= v.localDate, {
+    message: "endsOn must not be before localDate",
+    path: ["endsOn"],
   });
 
 export const updateTemplateInputSchema = z
@@ -32,6 +37,8 @@ export const updateTemplateInputSchema = z
     recurrenceType: z.enum(["daily", "weekdays"]).optional(),
     weekdays: weekdays.nullable().optional(),
     estimatedMinutes: estimatedMinutesSchema.nullable().optional(),
+    startsOn: isoDateSchema.optional(),
+    endsOn: isoDateSchema.nullable().optional(),
     isActive: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "empty update" })

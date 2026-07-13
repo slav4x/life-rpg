@@ -1,12 +1,14 @@
 import { GameError } from "@/application/game/errors";
-import { getDb, type DbClient } from "@/db/client";
+import { getDb, type Database } from "@/db/client";
 import { isUniqueConstraintViolation } from "@/db/errors";
 import {
   archiveTemplate,
+  getTemplateById,
   listTemplates,
   updateTemplate,
   type UpdateTemplateFields,
 } from "@/db/repositories/task-templates";
+import { cancelPendingTasksOutsideTemplateRange } from "@/db/repositories/tasks";
 import type { TaskTemplate } from "@/db/schema";
 
 export async function listUserTemplates(
@@ -19,7 +21,7 @@ export async function updateUserTemplate(
   userId: string,
   id: string,
   fields: UpdateTemplateFields,
-  db: DbClient = getDb(),
+  db: Database = getDb(),
 ): Promise<TaskTemplate> {
   // Switching to a daily recurrence clears any leftover weekday list.
   const normalized: UpdateTemplateFields =
@@ -27,7 +29,36 @@ export async function updateUserTemplate(
 
   let template: TaskTemplate | undefined;
   try {
-    template = await updateTemplate(db, userId, id, normalized);
+    template = await db.transaction(async (tx) => {
+      const current = await getTemplateById(tx, userId, id);
+      if (!current) {
+        throw new GameError("template_not_found", "Template not found");
+      }
+      const startsOn = normalized.startsOn ?? current.startsOn;
+      const endsOn =
+        normalized.endsOn === undefined ? current.endsOn : normalized.endsOn;
+      if (endsOn && endsOn < startsOn) {
+        throw new GameError(
+          "invalid_input",
+          "Template end date precedes start date",
+        );
+      }
+
+      const updated = await updateTemplate(tx, userId, id, normalized);
+      if (
+        updated &&
+        (normalized.startsOn !== undefined || normalized.endsOn !== undefined)
+      ) {
+        await cancelPendingTasksOutsideTemplateRange(
+          tx,
+          userId,
+          id,
+          updated.startsOn,
+          updated.endsOn,
+        );
+      }
+      return updated;
+    });
   } catch (error) {
     if (
       isUniqueConstraintViolation(

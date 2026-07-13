@@ -1,8 +1,9 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 import { Progress } from "@/components/ui/progress";
 import type { LevelProgress } from "@/domain/game/calculate-level";
+import type { PlanningSummary } from "@/application/tasks/planning";
 import { addDaysToDate } from "@/lib/dates/local-date";
 
 import { TaskFormDrawer } from "./task-form-drawer";
@@ -20,6 +21,7 @@ interface TodayScreenProps {
   totalCount: number;
   tasks: TaskVM[];
   skills: SkillOption[];
+  planning: PlanningSummary;
 }
 
 function formatDate(date: string): string {
@@ -32,6 +34,13 @@ function formatDate(date: string): string {
 
 function dateHref(date: string, today: string): string {
   return date === today ? "/" : `/?date=${date}`;
+}
+
+function shortDate(date: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "short",
+  }).format(new Date(`${date}T00:00:00`));
 }
 
 export function TodayScreen(props: TodayScreenProps) {
@@ -97,6 +106,88 @@ export function TodayScreen(props: TodayScreenProps) {
           </div>
         </div>
       </header>
+
+      <section className="flex flex-col gap-3 rounded-2xl border bg-card p-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-sm font-medium">
+            <CalendarDays className="size-4" />
+            Планирование
+          </h2>
+          <form className="flex items-center gap-1" action="/">
+            <input
+              type="date"
+              name="date"
+              defaultValue={props.date}
+              aria-label="Перейти к дате"
+              className="h-9 min-w-0 rounded-md border bg-background px-2 text-xs"
+            />
+            <button
+              type="submit"
+              className="h-9 rounded-md border px-2 text-xs hover:bg-muted"
+            >
+              Перейти
+            </button>
+          </form>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <a href="#overdue" className="rounded-lg bg-muted px-2 py-2">
+            <span className="block text-lg font-semibold">
+              {props.planning.overdueCount}
+            </span>
+            <span className="text-[11px] text-muted-foreground">Просрочено</span>
+          </a>
+          <Link href="/" className="rounded-lg bg-muted px-2 py-2">
+            <span className="block text-lg font-semibold">
+              {props.planning.todayCount}
+            </span>
+            <span className="text-[11px] text-muted-foreground">Сегодня</span>
+          </Link>
+          <a href="#next-seven" className="rounded-lg bg-muted px-2 py-2">
+            <span className="block text-lg font-semibold">
+              {props.planning.nextSevenCount}
+            </span>
+            <span className="text-[11px] text-muted-foreground">7 дней</span>
+          </a>
+        </div>
+
+        {props.planning.overdue.length > 0 && (
+          <details id="overdue" className="text-xs">
+            <summary className="flex min-h-11 cursor-pointer items-center text-muted-foreground">
+              Просроченные даты
+            </summary>
+            <div className="flex flex-wrap gap-2 pb-1">
+              {props.planning.overdue.map((item) => (
+                <Link
+                  key={item.date}
+                  href={dateHref(item.date, props.today)}
+                  className="rounded-md border px-2 py-1.5"
+                >
+                  {shortDate(item.date)} · {item.count}
+                </Link>
+              ))}
+            </div>
+          </details>
+        )}
+
+        <div id="next-seven" className="flex flex-wrap gap-2">
+          {Array.from({ length: 7 }, (_, index) => {
+            const date = addDaysToDate(props.today, index);
+            const count =
+              props.planning.nextSeven.find((item) => item.date === date)?.count ?? 0;
+            return (
+              <Link
+                key={date}
+                href={dateHref(date, props.today)}
+                className="flex min-w-14 flex-1 flex-col items-center rounded-md border px-1 py-1.5 text-xs"
+              >
+                <span>{shortDate(date)}</span>
+                <span className="text-muted-foreground">{count}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">

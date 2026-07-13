@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gt, lt, lte, ne, or, sql } from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
 import {
@@ -209,6 +209,80 @@ export async function updateTask(
     .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
     .returning();
   return task;
+}
+
+/** Update already-materialised pending occurrences after the edited task date. */
+export async function updateFuturePendingTasksFromTemplate(
+  db: DbClient,
+  userId: string,
+  templateId: string,
+  afterDate: string,
+  fields: Omit<UpdateTaskFields, "localDate">,
+): Promise<void> {
+  await db
+    .update(tasks)
+    .set({ ...fields, updatedAt: new Date() })
+    .where(
+      and(
+        eq(tasks.userId, userId),
+        eq(tasks.templateId, templateId),
+        eq(tasks.status, "pending"),
+        gt(tasks.localDate, afterDate),
+      ),
+    );
+}
+
+/** Cancel pending materialised tasks that no longer fit template boundaries. */
+export async function cancelPendingTasksOutsideTemplateRange(
+  db: DbClient,
+  userId: string,
+  templateId: string,
+  startsOn: string,
+  endsOn: string | null,
+): Promise<void> {
+  const outside = endsOn
+    ? or(lt(tasks.localDate, startsOn), gt(tasks.localDate, endsOn))
+    : lt(tasks.localDate, startsOn);
+  await db
+    .update(tasks)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(
+      and(
+        eq(tasks.userId, userId),
+        eq(tasks.templateId, templateId),
+        eq(tasks.status, "pending"),
+        outside,
+      ),
+    );
+}
+
+export interface PendingTaskDateCount {
+  date: string;
+  count: number;
+}
+
+/** Pending tasks grouped by date up to the planning horizon. */
+export async function countPendingTasksByDateThrough(
+  db: DbClient,
+  userId: string,
+  throughDate: string,
+): Promise<PendingTaskDateCount[]> {
+  const rows = await db
+    .select({
+      date: tasks.localDate,
+      count: sql<string>`count(*)`,
+    })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.userId, userId),
+        eq(tasks.status, "pending"),
+        lte(tasks.localDate, throughDate),
+      ),
+    )
+    .groupBy(tasks.localDate)
+    .orderBy(asc(tasks.localDate));
+  return rows.map((row) => ({ date: row.date, count: Number(row.count) }));
 }
 
 export async function deleteTask(

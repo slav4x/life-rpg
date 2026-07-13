@@ -5,6 +5,7 @@ import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { ensureTasksForDate } from "@/application/tasks/ensure-daily-tasks";
+import { getPlanningSummary } from "@/application/tasks/planning";
 import { createUserTemplate } from "@/application/templates/create-template";
 import { ensureAttributes, listAttributes } from "@/db/repositories/attributes";
 import { createSkill } from "@/db/repositories/skills";
@@ -12,6 +13,7 @@ import {
   archiveTemplate,
   createTemplate,
 } from "@/db/repositories/task-templates";
+import { createTask } from "@/db/repositories/tasks";
 import * as schema from "@/db/schema";
 import { tasks, users } from "@/db/schema";
 import { addDaysToDate, getIsoWeekday } from "@/lib/dates/local-date";
@@ -107,6 +109,55 @@ describe.skipIf(!url)("ensureTasksForDate (integration)", () => {
       .where(and(eq(tasks.userId, userId), eq(tasks.localDate, otherDay)));
     expect(onDay).toHaveLength(1);
     expect(onOther).toHaveLength(0);
+  });
+
+  it("respects template start and end dates", async () => {
+    const startsOn = addDaysToDate(DATE, 1);
+    const endsOn = addDaysToDate(DATE, 2);
+    await createTemplate(db, {
+      userId,
+      skillId,
+      title: "Короткий цикл",
+      baseXp: 20,
+      difficulty: "normal",
+      recurrenceType: "daily",
+      startsOn,
+      endsOn,
+    });
+
+    for (const offset of [0, 1, 2, 3]) {
+      await ensureTasksForDate(userId, addDaysToDate(DATE, offset), db);
+    }
+
+    const rows = await db.select().from(tasks).where(eq(tasks.userId, userId));
+    expect(rows.map((row) => row.localDate).sort()).toEqual([startsOn, endsOn]);
+  });
+
+  it("summarises overdue, today and the next seven days", async () => {
+    for (const [title, localDate] of [
+      ["Просрочено", addDaysToDate(DATE, -1)],
+      ["Сегодня", DATE],
+      ["Скоро", addDaysToDate(DATE, 3)],
+      ["Позже", addDaysToDate(DATE, 8)],
+    ] as const) {
+      await createTask(db, {
+        userId,
+        skillId,
+        title,
+        localDate,
+        baseXp: 20,
+        difficulty: "normal",
+      });
+    }
+
+    const summary = await getPlanningSummary(userId, DATE, db);
+    expect(summary.overdueCount).toBe(1);
+    expect(summary.todayCount).toBe(1);
+    expect(summary.nextSevenCount).toBe(2);
+    expect(summary.nextSeven.map((item) => item.date)).toEqual([
+      DATE,
+      addDaysToDate(DATE, 3),
+    ]);
   });
 
   it("ignores archived templates", async () => {

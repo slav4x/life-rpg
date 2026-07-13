@@ -44,12 +44,15 @@ const TIMEZONES =
 const DAY_LABELS = ["", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
 function scheduleLabel(t: ProfileTemplate): string {
-  if (t.recurrenceType === "daily") return "Каждый день";
-  return (t.weekdays ?? [])
-    .slice()
-    .sort((a, b) => a - b)
-    .map((d) => DAY_LABELS[d])
-    .join(", ");
+  const recurrence =
+    t.recurrenceType === "daily"
+      ? "Каждый день"
+      : (t.weekdays ?? [])
+          .slice()
+          .sort((a, b) => a - b)
+          .map((d) => DAY_LABELS[d])
+          .join(", ");
+  return `${recurrence} · с ${t.startsOn}${t.endsOn ? ` до ${t.endsOn}` : ""}`;
 }
 
 async function patchProfile(body: Record<string, string>): Promise<Response> {

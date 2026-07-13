@@ -18,11 +18,14 @@ export async function ensureTasksForDate(
   if (templates.length === 0) return;
 
   const weekday = getIsoWeekday(localDate);
-  const applicable = templates.filter((t) =>
-    templateAppliesOnWeekday(
-      { recurrenceType: t.recurrenceType, weekdays: t.weekdays },
-      weekday,
-    ),
+  const applicable = templates.filter(
+    (t) =>
+      t.startsOn <= localDate &&
+      (!t.endsOn || t.endsOn >= localDate) &&
+      templateAppliesOnWeekday(
+        { recurrenceType: t.recurrenceType, weekdays: t.weekdays },
+        weekday,
+      ),
   );
 
   await insertTasksFromTemplates(

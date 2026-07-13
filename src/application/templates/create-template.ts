@@ -18,6 +18,7 @@ export interface CreateTemplateCommand {
   recurrenceType: string;
   weekdays?: number[];
   estimatedMinutes?: number;
+  endsOn?: string;
   /** The user's local date, so today's task is materialised immediately. */
   localDate: string;
 }
@@ -39,6 +40,9 @@ export async function createUserTemplate(
   ) {
     throw new GameError("invalid_input", "Select at least one weekday");
   }
+  if (cmd.endsOn && cmd.endsOn < cmd.localDate) {
+    throw new GameError("invalid_input", "Template end date precedes start date");
+  }
 
   const skill = await getSkillById(db, cmd.userId, cmd.skillId);
   if (!skill || skill.status !== "active") {
@@ -57,6 +61,8 @@ export async function createUserTemplate(
       recurrenceType: cmd.recurrenceType,
       weekdays: cmd.recurrenceType === "weekdays" ? (cmd.weekdays ?? null) : null,
       estimatedMinutes: cmd.estimatedMinutes ?? null,
+      startsOn: cmd.localDate,
+      endsOn: cmd.endsOn ?? null,
     });
   } catch (error) {
     if (

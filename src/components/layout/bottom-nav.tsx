@@ -2,9 +2,20 @@
 
 import { BarChart3, CalendarCheck, ScrollText, Sparkles, User } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useSyncExternalStore } from "react";
 
+import { isValidDateString } from "@/lib/dates/local-date";
 import { cn } from "@/lib/utils";
+
+const SELECTED_DATE_KEY = "life-rpg:selected-date";
+
+const subscribeToSelectedDate = () => () => {};
+
+function getStoredSelectedDate(): string | null {
+  const value = sessionStorage.getItem(SELECTED_DATE_KEY);
+  return value && isValidDateString(value) ? value : null;
+}
 
 const ITEMS = [
   { href: "/", label: "Сегодня", icon: CalendarCheck, enabled: true },
@@ -16,6 +27,26 @@ const ITEMS = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const queryDate = searchParams.get("date");
+  const validQueryDate =
+    queryDate && isValidDateString(queryDate) ? queryDate : null;
+  const storedDate = useSyncExternalStore(
+    subscribeToSelectedDate,
+    getStoredSelectedDate,
+    () => null,
+  );
+
+  useEffect(() => {
+    if (validQueryDate) {
+      sessionStorage.setItem(SELECTED_DATE_KEY, validQueryDate);
+    } else if (pathname === "/") {
+      sessionStorage.removeItem(SELECTED_DATE_KEY);
+    }
+  }, [pathname, validQueryDate]);
+
+  const selectedDate =
+    validQueryDate ?? (pathname === "/" ? null : storedDate);
 
   return (
     <nav className="sticky bottom-0 z-10 border-t bg-background/95 backdrop-blur">
@@ -39,8 +70,12 @@ export function BottomNav() {
             </span>
           );
 
+          const href = selectedDate
+            ? `${item.href}?date=${selectedDate}`
+            : item.href;
+
           return item.enabled ? (
-            <Link key={item.href} href={item.href} className="flex flex-1">
+            <Link key={item.href} href={href} className="flex flex-1">
               {inner}
             </Link>
           ) : (

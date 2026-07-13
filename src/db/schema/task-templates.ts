@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  date,
   integer,
   pgTable,
   smallint,
@@ -35,6 +36,10 @@ export const taskTemplates = pgTable("task_templates", {
   // ISO weekdays (1=Mon .. 7=Sun) when recurrenceType is "weekdays".
   weekdays: smallint("weekdays").array(),
   estimatedMinutes: integer("estimated_minutes"),
+  startsOn: date("starts_on", { mode: "string" })
+    .notNull()
+    .default(sql`current_date`),
+  endsOn: date("ends_on", { mode: "string" }),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -52,6 +57,10 @@ export const taskTemplates = pgTable("task_templates", {
   check(
     "task_templates_estimated_minutes_check",
     sql`${table.estimatedMinutes} is null or ${table.estimatedMinutes} between 1 and 1440`,
+  ),
+  check(
+    "task_templates_date_range_check",
+    sql`${table.endsOn} is null or ${table.endsOn} >= ${table.startsOn}`,
   ),
   check(
     "task_templates_recurrence_check",

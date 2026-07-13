@@ -211,6 +211,7 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
     expect(first.created).toEqual({ skills: 1, taskTemplates: 1, quests: 1 });
     const [importedTemplate] = await db.select().from(schema.taskTemplates);
     expect(importedTemplate.estimatedMinutes).toBe(20);
+    expect(importedTemplate.startsOn).toBe(today);
 
     const second = await importContentPack(userId, pack, db);
     expect(second.created).toEqual({ skills: 0, taskTemplates: 0, quests: 0 });

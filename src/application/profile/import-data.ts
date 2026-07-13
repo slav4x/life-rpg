@@ -8,6 +8,7 @@ import {
   type BackupImport,
   type ContentPack,
 } from "@/lib/validation/import-data";
+import { getLocalDate } from "@/lib/dates/local-date";
 
 export class DataImportError extends Error {
   constructor(
@@ -394,13 +395,15 @@ export async function importContentPack(
     throw new DataImportError("invalid_format", "Неподдерживаемый формат контент-пака");
   }
   const pack: ContentPack = parsed.data;
-  const [attributes, existingSkills, existingTemplates, existingQuests] =
+  const [attributes, existingSkills, existingTemplates, existingQuests, users] =
     await Promise.all([
       db.select().from(schema.attributes),
       db.select().from(schema.skills).where(eq(schema.skills.userId, userId)),
       db.select().from(schema.taskTemplates).where(eq(schema.taskTemplates.userId, userId)),
       db.select().from(schema.quests).where(eq(schema.quests.userId, userId)),
+      db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1),
     ]);
+  const templateStartsOn = getLocalDate(users[0]?.timezone ?? "UTC");
   const existingQuestIds = existingQuests.map((quest) => quest.id);
   const existingSteps =
     existingQuestIds.length > 0
@@ -556,6 +559,7 @@ export async function importContentPack(
         recurrenceType: template.recurrenceType,
         weekdays: template.recurrenceType === "weekdays" ? template.weekdays : null,
         estimatedMinutes: template.estimatedMinutes ?? null,
+        startsOn: templateStartsOn,
       });
     }
     for (const quest of questsToCreate) {

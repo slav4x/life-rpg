@@ -59,6 +59,21 @@ test("bottom navigation reaches every screen", async ({ page }) => {
   await expect(page.getByText("Выполните первое действие")).toBeVisible();
 });
 
+test("keeps the selected date between sections", async ({ page }) => {
+  const selectedDate = "2026-07-20";
+  await page.goto(`/?date=${selectedDate}`);
+  await expect(page.getByRole("heading", { name: "Планирование" })).toBeVisible({
+    timeout: 15000,
+  });
+  await expect(page.getByLabel("Перейти к дате")).toHaveValue(selectedDate);
+
+  await page.getByRole("link", { name: "Профиль" }).click();
+  await expect(page).toHaveURL(new RegExp(`/profile\\?date=${selectedDate}$`));
+  await page.getByRole("link", { name: "Сегодня" }).click();
+  await expect(page).toHaveURL(new RegExp(`\\?date=${selectedDate}$`));
+  await expect(page.getByLabel("Перейти к дате")).toHaveValue(selectedDate);
+});
+
 test("creates a one-off action", async ({ page }) => {
   const title = `E2E действие ${Date.now()}`;
 

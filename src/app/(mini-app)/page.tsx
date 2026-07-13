@@ -4,12 +4,17 @@ import { getAuthenticatedUser } from "@/application/auth/session";
 import { ensureWorkspace } from "@/application/game/bootstrap";
 import { getTodayData } from "@/application/game/today";
 import { ensureTasksForDate } from "@/application/tasks/ensure-daily-tasks";
+import { getPlanningSummary } from "@/application/tasks/planning";
 import { TelegramLogin } from "@/components/auth/telegram-login";
 import { TodayScreen } from "@/components/today/today-screen";
 import type { TaskVM } from "@/components/today/types";
 import { calculateFinalXp } from "@/domain/game/calculate-xp";
 import { isDifficulty } from "@/domain/game/constants";
-import { getLocalDate, isValidDateString } from "@/lib/dates/local-date";
+import {
+  addDaysToDate,
+  getLocalDate,
+  isValidDateString,
+} from "@/lib/dates/local-date";
 
 export default async function TodayPage({
   searchParams,
@@ -39,12 +44,19 @@ export default async function TodayPage({
   const viewedDate =
     requested && isValidDateString(requested) ? requested : today;
 
-  // Only materialise recurring tasks for today — never retroactively (SPEC §12).
-  if (viewedDate === today) {
-    await ensureTasksForDate(user.id, today);
+  // Keep a bounded planning horizon materialised; never create past occurrences.
+  const horizon = Array.from({ length: 7 }, (_, index) =>
+    addDaysToDate(today, index),
+  );
+  await Promise.all(horizon.map((date) => ensureTasksForDate(user.id, date)));
+  if (viewedDate > horizon[horizon.length - 1]) {
+    await ensureTasksForDate(user.id, viewedDate);
   }
 
-  const data = await getTodayData(user.id, viewedDate);
+  const [data, planning] = await Promise.all([
+    getTodayData(user.id, viewedDate),
+    getPlanningSummary(user.id, today),
+  ]);
 
   const tasks: TaskVM[] = data.tasks.map(({ task, skill }) => {
     const difficulty = isDifficulty(task.difficulty) ? task.difficulty : "normal";
@@ -83,6 +95,7 @@ export default async function TodayPage({
         name: s.name,
         attributeId: s.attributeId,
       }))}
+      planning={planning}
     />
   );
 }

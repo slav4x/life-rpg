@@ -51,6 +51,8 @@ export interface TemplateEditVM {
   recurrenceType: string;
   weekdays: number[] | null;
   estimatedMinutes: number | null;
+  startsOn: string;
+  endsOn: string | null;
 }
 
 export function TemplateFormDrawer({
@@ -76,6 +78,8 @@ export function TemplateFormDrawer({
   const [minutes, setMinutes] = useState(
     template.estimatedMinutes ? String(template.estimatedMinutes) : "",
   );
+  const [startsOn, setStartsOn] = useState(template.startsOn);
+  const [endsOn, setEndsOn] = useState(template.endsOn ?? "");
 
   function toggleWeekday(iso: number) {
     setWeekdays((prev) =>
@@ -95,6 +99,10 @@ export function TemplateFormDrawer({
       toast.error("Выберите дни недели");
       return;
     }
+    if (endsOn && endsOn < startsOn) {
+      toast.error("Дата окончания не может быть раньше даты начала");
+      return;
+    }
 
     setBusy(true);
     try {
@@ -110,6 +118,8 @@ export function TemplateFormDrawer({
           weekdays: recurrence === "weekdays" ? weekdays : null,
           description: description.trim() || null,
           estimatedMinutes,
+          startsOn,
+          endsOn: endsOn || null,
         }),
       });
       if (!res.ok) {
@@ -226,6 +236,28 @@ export function TemplateFormDrawer({
                 ))}
               </div>
             )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="tpl-starts-on">Начало</Label>
+                <Input
+                  id="tpl-starts-on"
+                  type="date"
+                  value={startsOn}
+                  onChange={(e) => setStartsOn(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="tpl-ends-on">Окончание</Label>
+                <Input
+                  id="tpl-ends-on"
+                  type="date"
+                  min={startsOn}
+                  value={endsOn}
+                  onChange={(e) => setEndsOn(e.target.value)}
+                />
+              </div>
+            </div>
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="tpl-minutes">Длительность, мин (необязательно)</Label>

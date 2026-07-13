@@ -39,6 +39,8 @@ export interface ProfileTemplate {
   recurrenceType: string;
   weekdays: number[] | null;
   estimatedMinutes: number | null;
+  startsOn: string;
+  endsOn: string | null;
   isActive: boolean;
   archived: boolean;
 }
@@ -98,6 +100,8 @@ export async function getProfileData(
       recurrenceType: t.recurrenceType,
       weekdays: t.weekdays,
       estimatedMinutes: t.estimatedMinutes,
+      startsOn: t.startsOn,
+      endsOn: t.endsOn,
       isActive: t.isActive,
       archived: t.archivedAt !== null,
     })),

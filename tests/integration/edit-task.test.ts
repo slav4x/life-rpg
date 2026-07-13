@@ -10,9 +10,11 @@ import { ensureTasksForDate } from "@/application/tasks/ensure-daily-tasks";
 import { ensureAttributes, listAttributes } from "@/db/repositories/attributes";
 import { createSkill } from "@/db/repositories/skills";
 import { createTemplate } from "@/db/repositories/task-templates";
+import { updateUserTemplate } from "@/application/templates/manage-template";
 import { createTask } from "@/db/repositories/tasks";
 import * as schema from "@/db/schema";
 import { taskTemplates, tasks, users } from "@/db/schema";
+import { addDaysToDate } from "@/lib/dates/local-date";
 
 const url = process.env.TEST_DATABASE_URL;
 
@@ -92,15 +94,26 @@ describe.skipIf(!url)("edit & cancel task (integration)", () => {
       difficulty: "normal",
       recurrenceType: "daily",
     });
-    await ensureTasksForDate(userId, DATE, db);
-    const [task] = await db
+    for (const offset of [0, 1, 2, 3]) {
+      await ensureTasksForDate(userId, addDaysToDate(DATE, offset), db);
+    }
+    const materialised = await db
       .select()
       .from(tasks)
-      .where(eq(tasks.templateId, template.id));
+      .where(eq(tasks.templateId, template.id))
+      .orderBy(tasks.localDate);
+    await db
+      .update(tasks)
+      .set({ status: "completed" })
+      .where(eq(tasks.id, materialised[2].id));
+    await db
+      .update(tasks)
+      .set({ status: "cancelled" })
+      .where(eq(tasks.id, materialised[3].id));
 
     await editTask(
       userId,
-      task.id,
+      materialised[0].id,
       { baseXp: 55, estimatedMinutes: 25, scope: "future" },
       db,
     );
@@ -111,6 +124,51 @@ describe.skipIf(!url)("edit & cancel task (integration)", () => {
       .where(eq(taskTemplates.id, template.id));
     expect(t.baseXp).toBe(55);
     expect(t.estimatedMinutes).toBe(25);
+    const updatedTasks = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.templateId, template.id))
+      .orderBy(tasks.localDate);
+    expect(updatedTasks.map((row) => row.baseXp)).toEqual([55, 55, 20, 20]);
+    expect(updatedTasks.map((row) => row.estimatedMinutes)).toEqual([
+      25,
+      25,
+      null,
+      null,
+    ]);
+  });
+
+  it("cancels pending materialised tasks outside updated boundaries", async () => {
+    const template = await createTemplate(db, {
+      userId,
+      skillId,
+      title: "Границы",
+      baseXp: 20,
+      difficulty: "normal",
+      recurrenceType: "daily",
+      startsOn: DATE,
+    });
+    for (const offset of [0, 1, 2]) {
+      await ensureTasksForDate(userId, addDaysToDate(DATE, offset), db);
+    }
+
+    await updateUserTemplate(
+      userId,
+      template.id,
+      { startsOn: addDaysToDate(DATE, 1), endsOn: addDaysToDate(DATE, 1) },
+      db,
+    );
+
+    const rows = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.templateId, template.id))
+      .orderBy(tasks.localDate);
+    expect(rows.map((row) => row.status)).toEqual([
+      "cancelled",
+      "pending",
+      "cancelled",
+    ]);
   });
 
   it("deletes a one-off task but cancels a template task", async () => {

@@ -99,6 +99,7 @@ export function TaskFormDrawer({
     task?.estimatedMinutes ? String(task.estimatedMinutes) : "",
   );
   const [localDate, setLocalDate] = useState(task?.localDate ?? date);
+  const [endsOn, setEndsOn] = useState("");
   const [description, setDescription] = useState(
     task?.description ?? preset?.description ?? "",
   );
@@ -126,6 +127,10 @@ export function TaskFormDrawer({
     }
     if (!Number.isFinite(xpNumber) || xpNumber < BASE_XP.min) {
       toast.error(`Базовый XP от ${BASE_XP.min} до ${BASE_XP.max}`);
+      return;
+    }
+    if (recurrence !== "none" && endsOn && endsOn < localDate) {
+      toast.error("Дата окончания не может быть раньше даты начала");
       return;
     }
     const estimatedMinutes = minutes.trim() ? Math.round(Number(minutes)) : null;
@@ -164,7 +169,8 @@ export function TaskFormDrawer({
             baseXp: xpNumber,
             recurrenceType: recurrence,
             weekdays: recurrence === "weekdays" ? weekdays : undefined,
-            localDate: date,
+            localDate,
+            endsOn: endsOn || undefined,
             description: description.trim() || undefined,
             estimatedMinutes: estimatedMinutes ?? undefined,
           }),
@@ -202,6 +208,7 @@ export function TaskFormDrawer({
         setDescription("");
         setRecurrence("none");
         setWeekdays([]);
+        setEndsOn("");
       }
       router.refresh();
     } catch {
@@ -361,6 +368,30 @@ export function TaskFormDrawer({
                     {d.label}
                   </button>
                 ))}
+              </div>
+            )}
+
+            {!isEdit && !preset && recurrence !== "none" && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="task-starts-on">Начало</Label>
+                  <Input
+                    id="task-starts-on"
+                    type="date"
+                    value={localDate}
+                    onChange={(e) => setLocalDate(e.target.value)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="task-ends-on">Окончание</Label>
+                  <Input
+                    id="task-ends-on"
+                    type="date"
+                    min={localDate}
+                    value={endsOn}
+                    onChange={(e) => setEndsOn(e.target.value)}
+                  />
+                </div>
               </div>
             )}
 

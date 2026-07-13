@@ -47,6 +47,8 @@ const templateRow = z.object({
   recurrenceType: z.string(),
   weekdays: z.array(z.number().int()).nullable(),
   estimatedMinutes: z.number().int().min(1).max(1440).nullable().default(null),
+  startsOn: isoDateSchema.default("1970-01-01"),
+  endsOn: isoDateSchema.nullable().default(null),
   isActive: z.boolean(),
   createdAt: timestamp,
   updatedAt: timestamp,
