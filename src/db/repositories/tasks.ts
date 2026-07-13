@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
 import { skills, tasks, type Skill, type Task } from "@/db/schema";
@@ -72,7 +72,13 @@ export async function listTasksForDate(
     .select({ task: tasks, skill: skills })
     .from(tasks)
     .innerJoin(skills, eq(skills.id, tasks.skillId))
-    .where(and(eq(tasks.userId, userId), eq(tasks.localDate, localDate)))
+    .where(
+      and(
+        eq(tasks.userId, userId),
+        eq(tasks.localDate, localDate),
+        ne(tasks.status, "cancelled"),
+      ),
+    )
     .orderBy(asc(tasks.status), desc(tasks.createdAt));
 }
 
@@ -103,6 +109,51 @@ export async function lockTask(
     .limit(1)
     .for("update");
   return task;
+}
+
+export async function getTaskById(
+  db: DbClient,
+  userId: string,
+  id: string,
+): Promise<Task | undefined> {
+  const [task] = await db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
+    .limit(1);
+  return task;
+}
+
+export interface UpdateTaskFields {
+  title?: string;
+  description?: string | null;
+  skillId?: string;
+  localDate?: string;
+  baseXp?: number;
+  difficulty?: string;
+  estimatedMinutes?: number | null;
+}
+
+export async function updateTask(
+  db: DbClient,
+  userId: string,
+  id: string,
+  fields: UpdateTaskFields,
+): Promise<Task | undefined> {
+  const [task] = await db
+    .update(tasks)
+    .set({ ...fields, updatedAt: new Date() })
+    .where(and(eq(tasks.id, id), eq(tasks.userId, userId)))
+    .returning();
+  return task;
+}
+
+export async function deleteTask(
+  db: DbClient,
+  userId: string,
+  id: string,
+): Promise<void> {
+  await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.userId, userId)));
 }
 
 export async function setTaskStatus(

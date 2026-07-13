@@ -1,4 +1,3 @@
-import { ensureTasksForDate } from "@/application/tasks/ensure-daily-tasks";
 import { getDb } from "@/db/client";
 import { listAttributes } from "@/db/repositories/attributes";
 import { listActiveSkills } from "@/db/repositories/skills";
@@ -30,9 +29,6 @@ export async function getTodayData(
   localDate: string,
 ): Promise<TodayData> {
   const db = getDb();
-
-  // Materialise recurring tasks before reading (SPEC §12).
-  await ensureTasksForDate(userId, localDate, db);
 
   const [totalXp, dayXp, tasks, skills, attributes, streaks, templates] =
     await Promise.all([

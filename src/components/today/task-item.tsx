@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Flame } from "lucide-react";
+import { Check, Flame, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -12,12 +12,21 @@ import { Button } from "@/components/ui/button";
 import { DIFFICULTIES } from "@/domain/game/constants";
 import { cn } from "@/lib/utils";
 
-import type { TaskVM } from "./types";
+import { TaskFormDrawer } from "./task-form-drawer";
+import type { SkillOption, TaskVM } from "./types";
 
 const difficultyLabel = (value: string) =>
   DIFFICULTIES.find((d) => d.value === value)?.label ?? value;
 
-export function TaskItem({ task }: { task: TaskVM }) {
+export function TaskItem({
+  task,
+  date,
+  skills,
+}: {
+  task: TaskVM;
+  date: string;
+  skills: SkillOption[];
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const done = task.status !== "pending";
@@ -96,6 +105,11 @@ export function TaskItem({ task }: { task: TaskVM }) {
         >
           {task.title}
         </span>
+        {task.description && (
+          <span className="truncate text-xs text-muted-foreground">
+            {task.description}
+          </span>
+        )}
         <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
           <Badge variant="secondary" className="font-normal">
             {task.skillName}
@@ -103,6 +117,12 @@ export function TaskItem({ task }: { task: TaskVM }) {
           <span>+{task.finalXp} XP</span>
           <span>·</span>
           <span>{difficultyLabel(task.difficulty)}</span>
+          {task.estimatedMinutes != null && (
+            <>
+              <span>·</span>
+              <span>~{task.estimatedMinutes} мин</span>
+            </>
+          )}
           {task.streak != null && task.streak > 0 && (
             <span className="inline-flex items-center gap-0.5 text-foreground">
               <Flame className="size-3" />
@@ -126,15 +146,41 @@ export function TaskItem({ task }: { task: TaskVM }) {
           <Check className="size-5 text-primary" aria-label="Выполнено" />
         </div>
       ) : (
-        <Button
-          size="sm"
-          variant="outline"
-          className="shrink-0"
-          onClick={complete}
-          disabled={loading}
-        >
-          {loading ? "…" : "Готово"}
-        </Button>
+        <div className="flex shrink-0 items-center gap-1">
+          <TaskFormDrawer
+            date={date}
+            skills={skills}
+            task={{
+              id: task.id,
+              title: task.title,
+              description: task.description,
+              skillId: task.skillId,
+              difficulty: task.difficulty,
+              baseXp: task.baseXp,
+              localDate: date,
+              estimatedMinutes: task.estimatedMinutes,
+              templateId: task.templateId,
+            }}
+            trigger={
+              <Button
+                size="icon"
+                variant="ghost"
+                className="text-muted-foreground"
+                aria-label="Изменить"
+              >
+                <Pencil className="size-4" />
+              </Button>
+            }
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={complete}
+            disabled={loading}
+          >
+            {loading ? "…" : "Готово"}
+          </Button>
+        </div>
       )}
     </li>
   );

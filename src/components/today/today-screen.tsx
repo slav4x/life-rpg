@@ -1,13 +1,18 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import Link from "next/link";
+
 import { Progress } from "@/components/ui/progress";
 import type { LevelProgress } from "@/domain/game/calculate-level";
+import { addDaysToDate } from "@/lib/dates/local-date";
 
-import { AddActionDrawer } from "./add-action-drawer";
+import { TaskFormDrawer } from "./task-form-drawer";
 import { TaskItem } from "./task-item";
 import type { SkillOption, TaskVM } from "./types";
 
 interface TodayScreenProps {
   userName: string;
   date: string;
+  today: string;
   level: LevelProgress;
   totalXp: number;
   dayXp: number;
@@ -25,21 +30,52 @@ function formatDate(date: string): string {
   }).format(new Date(`${date}T00:00:00`));
 }
 
+function dateHref(date: string, today: string): string {
+  return date === today ? "/" : `/?date=${date}`;
+}
+
 export function TodayScreen(props: TodayScreenProps) {
   const pending = props.tasks.filter((t) => t.status === "pending");
   const done = props.tasks.filter((t) => t.status !== "pending");
   const levelPercent = Math.round(props.level.ratio * 100);
+  const isToday = props.date === props.today;
+  const prev = addDaysToDate(props.date, -1);
+  const next = addDaysToDate(props.date, 1);
 
   return (
     <div className="flex flex-col gap-5 py-2">
       <header className="flex flex-col gap-4">
-        <div>
+        {isToday && (
           <h1 className="text-xl font-semibold tracking-tight">
             Привет, {props.userName}
           </h1>
-          <p className="text-sm text-muted-foreground capitalize">
-            {formatDate(props.date)}
-          </p>
+        )}
+
+        <div className="flex items-center justify-between">
+          <Link
+            href={dateHref(prev, props.today)}
+            className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+            aria-label="Предыдущий день"
+          >
+            <ChevronLeft className="size-5" />
+          </Link>
+          <div className="flex flex-col items-center">
+            <span className="text-sm font-medium capitalize">
+              {formatDate(props.date)}
+            </span>
+            {!isToday && (
+              <Link href="/" className="text-xs text-muted-foreground underline">
+                к сегодня
+              </Link>
+            )}
+          </div>
+          <Link
+            href={dateHref(next, props.today)}
+            className="rounded-md p-1 text-muted-foreground hover:bg-muted"
+            aria-label="Следующий день"
+          >
+            <ChevronRight className="size-5" />
+          </Link>
         </div>
 
         <div className="rounded-2xl border bg-card p-4">
@@ -54,7 +90,7 @@ export function TodayScreen(props: TodayScreenProps) {
           <Progress value={levelPercent} className="mt-2" />
           <div className="mt-3 flex justify-between text-xs text-muted-foreground">
             <span>Всего: {props.totalXp} XP</span>
-            <span>Сегодня: +{props.dayXp} XP</span>
+            <span>За день: +{props.dayXp} XP</span>
           </div>
         </div>
       </header>
@@ -67,19 +103,24 @@ export function TodayScreen(props: TodayScreenProps) {
               {props.completedCount} / {props.totalCount}
             </span>
           </h2>
-          <AddActionDrawer date={props.date} skills={props.skills} />
+          <TaskFormDrawer date={props.date} skills={props.skills} />
         </div>
 
         {props.tasks.length === 0 ? (
           <div className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-            На сегодня задач нет. Добавьте первое действие.
+            На этот день задач нет. Добавьте действие.
           </div>
         ) : (
           <div className="flex flex-col gap-4">
             {pending.length > 0 && (
               <ul className="flex flex-col gap-2">
                 {pending.map((task) => (
-                  <TaskItem key={task.id} task={task} />
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    date={props.date}
+                    skills={props.skills}
+                  />
                 ))}
               </ul>
             )}
@@ -90,7 +131,12 @@ export function TodayScreen(props: TodayScreenProps) {
                 </p>
                 <ul className="flex flex-col gap-2">
                   {done.map((task) => (
-                    <TaskItem key={task.id} task={task} />
+                    <TaskItem
+                      key={task.id}
+                      task={task}
+                      date={props.date}
+                      skills={props.skills}
+                    />
                   ))}
                 </ul>
               </div>

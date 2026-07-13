@@ -100,11 +100,8 @@ export function ProfileScreen({
 
       <ProfileSettings
         timezone={timezone}
-        templates={data.templates.map((t) => ({
-          id: t.id,
-          title: t.title,
-          isActive: t.isActive,
-        }))}
+        templates={data.templates}
+        skills={data.skills}
       />
     </div>
   );

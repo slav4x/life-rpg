@@ -79,6 +79,7 @@ export async function getTemplateById(
 export interface UpdateTemplateFields {
   title?: string;
   description?: string | null;
+  skillId?: string;
   baseXp?: number;
   difficulty?: string;
   recurrenceType?: string;

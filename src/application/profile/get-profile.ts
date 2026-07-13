@@ -4,6 +4,7 @@ import {
   listUserAchievements,
 } from "@/db/repositories/achievements";
 import { attributeDistribution } from "@/db/repositories/progress";
+import { listActiveSkills } from "@/db/repositories/skills";
 import { listTemplates } from "@/db/repositories/task-templates";
 import { sumGlobalXp } from "@/db/repositories/xp";
 import {
@@ -30,9 +31,19 @@ export interface ProfileAchievement {
 export interface ProfileTemplate {
   id: string;
   title: string;
+  skillId: string;
+  baseXp: number;
+  difficulty: string;
+  description: string | null;
   recurrenceType: string;
   weekdays: number[] | null;
   isActive: boolean;
+  archived: boolean;
+}
+
+export interface ProfileSkillOption {
+  id: string;
+  name: string;
 }
 
 export interface ProfileData {
@@ -41,6 +52,7 @@ export interface ProfileData {
   attributes: ProfileAttribute[];
   achievements: ProfileAchievement[];
   templates: ProfileTemplate[];
+  skills: ProfileSkillOption[];
 }
 
 /** Everything the profile screen shows (SPEC §6.7). */
@@ -48,13 +60,14 @@ export async function getProfileData(
   userId: string,
   db: DbClient = getDb(),
 ): Promise<ProfileData> {
-  const [totalXp, attributes, allAchievements, userAchievements, templates] =
+  const [totalXp, attributes, allAchievements, userAchievements, templates, skills] =
     await Promise.all([
       sumGlobalXp(db, userId),
       attributeDistribution(db, userId),
       listAchievements(db),
       listUserAchievements(db, userId),
       listTemplates(db, userId),
+      listActiveSkills(db, userId),
     ]);
 
   const unlockedIds = new Set(userAchievements.map((u) => u.achievementId));
@@ -73,9 +86,15 @@ export async function getProfileData(
     templates: templates.map((t) => ({
       id: t.id,
       title: t.title,
+      skillId: t.skillId,
+      baseXp: t.baseXp,
+      difficulty: t.difficulty,
+      description: t.description,
       recurrenceType: t.recurrenceType,
       weekdays: t.weekdays,
-      isActive: t.isActive && t.archivedAt === null,
+      isActive: t.isActive,
+      archived: t.archivedAt !== null,
     })),
+    skills: skills.map((s) => ({ id: s.id, name: s.name })),
   };
 }
