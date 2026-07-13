@@ -5,6 +5,7 @@ import {
   taskCompletions,
   tasks,
   quests,
+  questCompletions,
   userAttributes,
   userSkills,
   xpTransactions,
@@ -98,10 +99,14 @@ export async function listRecentXpEvents(
       : Promise.resolve([]),
     questIds.size > 0
       ? db
-          .select({ id: quests.id, title: quests.title })
-          .from(quests)
+          .select({ id: questCompletions.id, title: quests.title })
+          .from(questCompletions)
+          .innerJoin(quests, eq(quests.id, questCompletions.questId))
           .where(
-            and(eq(quests.userId, userId), inArray(quests.id, [...questIds])),
+            and(
+              eq(questCompletions.userId, userId),
+              inArray(questCompletions.id, [...questIds]),
+            ),
           )
       : Promise.resolve([]),
   ]);
@@ -211,6 +216,24 @@ export async function getTransactionsBySource(
         eq(xpTransactions.userId, userId),
         eq(xpTransactions.sourceId, sourceId),
         eq(xpTransactions.sourceType, "task_completion"),
+      ),
+    );
+}
+
+export async function getTransactionsBySourceAndType(
+  db: DbClient,
+  userId: string,
+  sourceId: string,
+  sourceType: "task_completion" | "quest_completion",
+): Promise<XpTransaction[]> {
+  return db
+    .select()
+    .from(xpTransactions)
+    .where(
+      and(
+        eq(xpTransactions.userId, userId),
+        eq(xpTransactions.sourceId, sourceId),
+        eq(xpTransactions.sourceType, sourceType),
       ),
     );
 }

@@ -6,6 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { completeTask } from "@/application/tasks/complete-task";
 import { completeQuest } from "@/application/quests/complete-quest";
+import { revertQuest } from "@/application/quests/revert-quest";
 import { updateUserQuest } from "@/application/quests/manage-quests";
 import { toggleStep } from "@/application/quests/toggle-step";
 import { createOneOffTask } from "@/application/tasks/create-task";
@@ -103,6 +104,39 @@ describe.skipIf(!url)("quests & achievements (integration)", () => {
 
     expect(again.alreadyCompleted).toBe(true);
     expect(await sumGlobalXp(db, userId)).toBe(300);
+  });
+
+  it("reverts a quest idempotently and allows completing it again", async () => {
+    const quest = await activeQuest(300);
+    await completeAllSteps(quest.id);
+    await completeQuest({ userId, questId: quest.id }, db);
+    const unlockedBeforeRevert = await listUserAchievements(db, userId);
+
+    const reverted = await revertQuest({ userId, questId: quest.id }, db);
+    expect(reverted).toMatchObject({ reverted: true, alreadyReverted: false });
+    expect(await sumGlobalXp(db, userId)).toBe(0);
+    expect(await listUserAchievements(db, userId)).toEqual(unlockedBeforeRevert);
+
+    const repeated = await revertQuest({ userId, questId: quest.id }, db);
+    expect(repeated).toMatchObject({ reverted: false, alreadyReverted: true });
+
+    const completedAgain = await completeQuest({ userId, questId: quest.id }, db);
+    expect(completedAgain.alreadyCompleted).toBe(false);
+    expect(await sumGlobalXp(db, userId)).toBe(300);
+
+    const completions = await db.select().from(schema.questCompletions);
+    expect(completions).toHaveLength(2);
+    expect(completions.filter((row) => row.revertedAt === null)).toHaveLength(1);
+  });
+
+  it("reverts a zero-XP quest without requiring an XP transaction", async () => {
+    const quest = await activeQuest(0);
+    await completeAllSteps(quest.id);
+    await completeQuest({ userId, questId: quest.id }, db);
+
+    await expect(revertQuest({ userId, questId: quest.id }, db)).resolves.toMatchObject({
+      reverted: true,
+    });
   });
 
   it("rejects completion while required steps are unfinished", async () => {

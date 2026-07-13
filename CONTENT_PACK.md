@@ -26,7 +26,8 @@
       "baseXp": 20,
       "difficulty": "easy",
       "recurrenceType": "weekdays",
-      "weekdays": [1, 2, 3, 4, 5]
+      "weekdays": [1, 2, 3, 4, 5],
+      "estimatedMinutes": 20
     }
   ],
   "quests": [
@@ -54,6 +55,7 @@
 - `recurrenceType`: `daily` или `weekdays`; для `weekdays` обязательны дни `1–7`;
 - `type`: `main`, `side`, `long_term`;
 - `baseXp`: `5–250`, `rewardXp`: `0–10000`;
+- `estimatedMinutes`: необязательная длительность повторяющегося действия, `1–1440`;
 - `icon`: `✨`, `💪`, `🧠`, `💼`, `🤝`, `🎨`, `⚡`, `📚`;
 - `color`: `#6366F1`, `#0EA5E9`, `#14B8A6`, `#22C55E`, `#F59E0B`,
   `#F97316`, `#EC4899`, `#8B5CF6`.

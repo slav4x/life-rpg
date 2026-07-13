@@ -6,6 +6,7 @@ import {
 } from "@/application/game/check-achievements";
 import { GameError } from "@/application/game/errors";
 import { recomputeStreak } from "@/application/game/recompute-streak";
+import { assertTaskCompletionDate } from "@/application/tasks/completion-date-policy";
 import { completeLinkedQuestStep } from "@/application/quests/complete-linked-step";
 import type { QuestCompletionOutcome } from "@/application/quests/award-completion";
 import { getDb, type Database, type Transaction } from "@/db/client";
@@ -28,6 +29,7 @@ import { attributes, type Attribute, type Skill } from "@/db/schema";
 import { calculateLevel } from "@/domain/game/calculate-level";
 import { calculateAttributeXp, calculateXpBreakdown } from "@/domain/game/calculate-xp";
 import { DIFFICULTY_MULTIPLIERS, isDifficulty } from "@/domain/game/constants";
+import { getLocalDate } from "@/lib/dates/local-date";
 
 export interface CompleteTaskResult {
   completionId: string;
@@ -45,6 +47,8 @@ export interface CompleteTaskCommand {
   userId: string;
   taskId: string;
   idempotencyKey: string;
+  /** User's current local calendar date; injected by the HTTP boundary. */
+  todayLocalDate?: string;
 }
 
 /**
@@ -87,6 +91,10 @@ export async function completeTask(
     if (task.status !== "pending") {
       throw new GameError("task_not_pending", "Task is not pending");
     }
+    assertTaskCompletionDate(
+      task.localDate,
+      cmd.todayLocalDate ?? getLocalDate("UTC"),
+    );
     if (!isDifficulty(task.difficulty)) {
       throw new GameError("invalid_input", "Unknown difficulty");
     }

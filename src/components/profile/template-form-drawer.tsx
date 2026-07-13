@@ -50,6 +50,7 @@ export interface TemplateEditVM {
   description: string | null;
   recurrenceType: string;
   weekdays: number[] | null;
+  estimatedMinutes: number | null;
 }
 
 export function TemplateFormDrawer({
@@ -72,6 +73,9 @@ export function TemplateFormDrawer({
   const [recurrence, setRecurrence] = useState(template.recurrenceType);
   const [weekdays, setWeekdays] = useState<number[]>(template.weekdays ?? []);
   const [description, setDescription] = useState(template.description ?? "");
+  const [minutes, setMinutes] = useState(
+    template.estimatedMinutes ? String(template.estimatedMinutes) : "",
+  );
 
   function toggleWeekday(iso: number) {
     setWeekdays((prev) =>
@@ -82,6 +86,7 @@ export function TemplateFormDrawer({
   async function submit() {
     const trimmed = title.trim();
     const xp = Math.round(Number(baseXp));
+    const estimatedMinutes = minutes.trim() ? Math.round(Number(minutes)) : null;
     if (!trimmed) {
       toast.error("Укажите название");
       return;
@@ -104,6 +109,7 @@ export function TemplateFormDrawer({
           recurrenceType: recurrence,
           weekdays: recurrence === "weekdays" ? weekdays : null,
           description: description.trim() || null,
+          estimatedMinutes,
         }),
       });
       if (!res.ok) {
@@ -220,6 +226,19 @@ export function TemplateFormDrawer({
                 ))}
               </div>
             )}
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="tpl-minutes">Длительность, мин (необязательно)</Label>
+              <Input
+                id="tpl-minutes"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={1440}
+                value={minutes}
+                onChange={(e) => setMinutes(e.target.value)}
+              />
+            </div>
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="tpl-desc">Описание (необязательно)</Label>

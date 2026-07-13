@@ -21,6 +21,7 @@ export async function exportUserData(
     completions,
     xpTransactions,
     quests,
+    questCompletions,
     streaks,
     userAchievements,
     attributes,
@@ -47,6 +48,10 @@ export async function exportUserData(
       .from(schema.xpTransactions)
       .where(eq(schema.xpTransactions.userId, userId)),
     db.select().from(schema.quests).where(eq(schema.quests.userId, userId)),
+    db
+      .select()
+      .from(schema.questCompletions)
+      .where(eq(schema.questCompletions.userId, userId)),
     db.select().from(schema.streaks).where(eq(schema.streaks.userId, userId)),
     db
       .select()
@@ -90,6 +95,7 @@ export async function exportUserData(
     taskCompletions: completions,
     xpTransactions,
     quests,
+    questCompletions,
     questSteps,
     streaks,
     userAchievements,

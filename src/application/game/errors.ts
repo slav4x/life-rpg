@@ -1,6 +1,8 @@
 export type GameErrorCode =
   | "task_not_found"
   | "task_not_pending"
+  | "task_date_future"
+  | "task_date_too_old"
   | "nothing_to_revert"
   | "template_not_found"
   | "quest_not_found"
@@ -34,6 +36,8 @@ export class GameError extends Error {
       case "attribute_not_found":
         return 404;
       case "task_not_pending":
+      case "task_date_future":
+      case "task_date_too_old":
       case "nothing_to_revert":
       case "quest_not_active":
       case "quest_steps_incomplete":

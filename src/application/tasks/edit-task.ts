@@ -69,6 +69,7 @@ export async function editTask(
       skillId: cmd.skillId,
       baseXp: cmd.baseXp,
       difficulty: cmd.difficulty,
+      estimatedMinutes: cmd.estimatedMinutes,
     });
   }
 

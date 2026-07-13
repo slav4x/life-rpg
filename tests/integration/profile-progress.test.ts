@@ -77,7 +77,7 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
 
   it("aggregates progress for the last 7 days", async () => {
     await completeOne(50);
-    await completeOne(100, addDaysToDate(today, -10), "Старая задача");
+    await completeOne(100, addDaysToDate(today, -7), "Старая задача");
 
     const quest = await createQuest(db, {
       userId,
@@ -112,6 +112,41 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
     expect(
       data.recent.find((event) => event.title === "Квест статистики"),
     ).toMatchObject({ kind: "quest", amount: 75 });
+  });
+
+  it("excludes future-dated legacy completions from progress statistics", async () => {
+    const task = await createTask(db, {
+      userId,
+      skillId,
+      title: "Будущая запись",
+      localDate: addDaysToDate(today, 1),
+      baseXp: 200,
+      difficulty: "normal",
+    });
+    const [completion] = await db
+      .insert(schema.taskCompletions)
+      .values({
+        userId,
+        taskId: task.id,
+        idempotencyKey: "legacy-future",
+        localDate: task.localDate,
+        finalXp: 200,
+      })
+      .returning();
+    await db.insert(schema.xpTransactions).values({
+      userId,
+      amount: 200,
+      scope: "global",
+      sourceType: "task_completion",
+      sourceId: completion.id,
+      baseXp: 200,
+      multiplier: "1",
+    });
+
+    const data = await getProgressData(userId, "all", "UTC", db);
+    expect(data.totalXp).toBe(0);
+    expect(data.completedTasks).toBe(0);
+    expect(data.daily.at(-1)).toEqual({ date: today, xp: 0 });
   });
 
   it("returns the profile with all attributes and achievements", async () => {
@@ -158,6 +193,7 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
           baseXp: 20,
           difficulty: "easy",
           recurrenceType: "daily",
+          estimatedMinutes: 20,
         },
       ],
       quests: [
@@ -173,6 +209,8 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
 
     const first = await importContentPack(userId, pack, db);
     expect(first.created).toEqual({ skills: 1, taskTemplates: 1, quests: 1 });
+    const [importedTemplate] = await db.select().from(schema.taskTemplates);
+    expect(importedTemplate.estimatedMinutes).toBe(20);
 
     const second = await importContentPack(userId, pack, db);
     expect(second.created).toEqual({ skills: 0, taskTemplates: 0, quests: 0 });

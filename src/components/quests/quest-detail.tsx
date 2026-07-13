@@ -155,6 +155,25 @@ export function QuestDetail({
     }
   }
 
+  async function revertCompletion() {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/quests/${quest.id}/revert`, { method: "POST" });
+      if (!res.ok) {
+        toast.error(await getApiErrorMessage(res, "Не удалось отменить завершение."));
+        return;
+      }
+      toast.success("Завершение квеста отменено", {
+        description: "XP скорректирован, достижения сохранены.",
+      });
+      router.refresh();
+    } catch {
+      toast.error(NETWORK_ERROR_MESSAGE);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-5 py-2">
       <Button
@@ -324,10 +343,29 @@ export function QuestDetail({
       </ul>
 
       {isCompleted ? (
-        <p className="text-sm text-muted-foreground">Квест завершён.</p>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline" disabled={busy}>Отменить завершение</Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Отменить завершение квеста?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Квест вернётся в активные, награда XP будет списана. Уже открытые
+                достижения останутся полученными.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Не отменять</AlertDialogCancel>
+              <AlertDialogAction onClick={revertCompletion}>
+                Отменить завершение
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       ) : isArchived ? (
         <p className="text-sm text-muted-foreground">Квест находится в архиве.</p>
-      ) : !quest.manualCompletion ? (
+      ) : !quest.manualCompletion && !allRequiredDone ? (
         <p className="text-sm text-muted-foreground">
           Квест завершится автоматически после выполнения обязательных шагов.
         </p>

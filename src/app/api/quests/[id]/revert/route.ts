@@ -1,13 +1,10 @@
-import { randomUUID } from "node:crypto";
-
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getAuthenticatedUser } from "@/application/auth/session";
 import { GameError } from "@/application/game/errors";
-import { completeTask } from "@/application/tasks/complete-task";
+import { revertQuest } from "@/application/quests/revert-quest";
 import { isTrustedOrigin } from "@/lib/http/origin";
-import { getLocalDate } from "@/lib/dates/local-date";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,34 +16,22 @@ export async function POST(
   if (!isTrustedOrigin(request)) {
     return NextResponse.json({ error: "forbidden_origin" }, { status: 403 });
   }
-
   const user = await getAuthenticatedUser();
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-
   const { id } = await context.params;
   if (!z.uuid().safeParse(id).success) {
-    return NextResponse.json({ error: "invalid_task_id" }, { status: 400 });
+    return NextResponse.json({ error: "invalid_quest_id" }, { status: 400 });
   }
 
-  // Idempotency key protects against double-submits (SPEC §9.3, §11).
-  const idempotencyKey =
-    request.headers.get("idempotency-key") ?? randomUUID();
-
   try {
-    const result = await completeTask({
-      userId: user.id,
-      taskId: id,
-      idempotencyKey,
-      todayLocalDate: getLocalDate(user.timezone),
-    });
-    return NextResponse.json(result);
+    return NextResponse.json(await revertQuest({ userId: user.id, questId: id }));
   } catch (error) {
     if (error instanceof GameError) {
       return NextResponse.json({ error: error.code }, { status: error.status });
     }
-    console.error("complete task failed:", (error as Error)?.message);
+    console.error("revert quest failed:", (error as Error)?.message);
     return NextResponse.json({ error: "internal_error" }, { status: 500 });
   }
 }

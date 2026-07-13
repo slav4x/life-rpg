@@ -51,6 +51,7 @@ export interface TemplateTaskRow {
   localDate: string;
   baseXp: number;
   difficulty: string;
+  estimatedMinutes: number | null;
 }
 
 /**

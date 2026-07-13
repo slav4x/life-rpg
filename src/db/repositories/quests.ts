@@ -111,6 +111,17 @@ export async function markQuestCompleted(
     .where(eq(quests.id, id));
 }
 
+export async function markQuestActive(
+  db: DbClient,
+  id: string,
+  updatedAt: Date = new Date(),
+): Promise<void> {
+  await db
+    .update(quests)
+    .set({ status: "active", completedAt: null, updatedAt })
+    .where(eq(quests.id, id));
+}
+
 export async function countCompletedQuests(
   db: DbClient,
   userId: string,

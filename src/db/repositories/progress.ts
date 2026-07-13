@@ -1,8 +1,9 @@
-import { and, asc, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, lte, sql } from "drizzle-orm";
 
 import type { DbClient } from "@/db/client";
 import {
   attributes,
+  questCompletions,
   taskCompletions,
   xpTransactions,
 } from "@/db/schema";
@@ -18,12 +19,14 @@ export async function xpByLocalDate(
   userId: string,
   timezone: string,
   fromDate?: string,
+  toDate?: string,
 ): Promise<DailyXp[]> {
   const conditions = [
     eq(taskCompletions.userId, userId),
     isNull(taskCompletions.revertedAt),
   ];
   if (fromDate) conditions.push(gte(taskCompletions.localDate, fromDate));
+  if (toDate) conditions.push(lte(taskCompletions.localDate, toDate));
 
   const taskRows = await db
     .select({
@@ -34,17 +37,17 @@ export async function xpByLocalDate(
     .where(and(...conditions))
     .groupBy(taskCompletions.localDate)
     .orderBy(asc(taskCompletions.localDate));
-  const questDate = sql<string>`(${xpTransactions.createdAt} at time zone ${timezone})::date`;
+  const questDate = sql<string>`(${questCompletions.completedAt} at time zone ${timezone})::date`;
   const questConditions = [
-    eq(xpTransactions.userId, userId),
-    eq(xpTransactions.scope, "global"),
-    eq(xpTransactions.sourceType, "quest_completion"),
+    eq(questCompletions.userId, userId),
+    isNull(questCompletions.revertedAt),
   ];
   if (fromDate) questConditions.push(gte(questDate, fromDate));
+  if (toDate) questConditions.push(lte(questDate, toDate));
 
   const questRows = await db
-    .select({ date: questDate, xp: sql<string>`sum(${xpTransactions.amount})` })
-    .from(xpTransactions)
+    .select({ date: questDate, xp: sql<string>`sum(${questCompletions.rewardXp})` })
+    .from(questCompletions)
     .where(and(...questConditions))
     .groupBy(sql`1`)
     .orderBy(sql`1 asc`);
@@ -62,12 +65,14 @@ export async function countCompletionsFrom(
   db: DbClient,
   userId: string,
   fromDate?: string,
+  toDate?: string,
 ): Promise<number> {
   const conditions = [
     eq(taskCompletions.userId, userId),
     isNull(taskCompletions.revertedAt),
   ];
   if (fromDate) conditions.push(gte(taskCompletions.localDate, fromDate));
+  if (toDate) conditions.push(lte(taskCompletions.localDate, toDate));
 
   const [row] = await db
     .select({ count: sql<string>`count(*)` })
@@ -87,6 +92,7 @@ export async function attributeDistribution(
   db: DbClient,
   userId: string,
   fromDate?: string,
+  toDate?: string,
 ): Promise<AttributeXp[]> {
   const completionConditions = [
     eq(taskCompletions.id, xpTransactions.sourceId),
@@ -95,6 +101,9 @@ export async function attributeDistribution(
   ];
   if (fromDate) {
     completionConditions.push(gte(taskCompletions.localDate, fromDate));
+  }
+  if (toDate) {
+    completionConditions.push(lte(taskCompletions.localDate, toDate));
   }
 
   const rows = await db

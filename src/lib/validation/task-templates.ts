@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { baseXpSchema, isoDateSchema } from "./common";
+import { baseXpSchema, estimatedMinutesSchema, isoDateSchema } from "./common";
 
 const difficulty = z.enum(["easy", "normal", "hard", "epic"]);
 const weekdays = z.array(z.number().int().min(1).max(7)).min(1).max(7);
@@ -14,6 +14,7 @@ export const createTemplateInputSchema = z
     difficulty,
     recurrenceType: z.enum(["daily", "weekdays"]),
     weekdays: weekdays.optional(),
+    estimatedMinutes: estimatedMinutesSchema.optional(),
     localDate: isoDateSchema,
   })
   .refine((v) => v.recurrenceType !== "weekdays" || Boolean(v.weekdays), {
@@ -30,6 +31,7 @@ export const updateTemplateInputSchema = z
     difficulty: difficulty.optional(),
     recurrenceType: z.enum(["daily", "weekdays"]).optional(),
     weekdays: weekdays.nullable().optional(),
+    estimatedMinutes: estimatedMinutesSchema.nullable().optional(),
     isActive: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "empty update" })

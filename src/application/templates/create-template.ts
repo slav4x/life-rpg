@@ -17,6 +17,7 @@ export interface CreateTemplateCommand {
   difficulty: string;
   recurrenceType: string;
   weekdays?: number[];
+  estimatedMinutes?: number;
   /** The user's local date, so today's task is materialised immediately. */
   localDate: string;
 }
@@ -55,6 +56,7 @@ export async function createUserTemplate(
       difficulty: cmd.difficulty,
       recurrenceType: cmd.recurrenceType,
       weekdays: cmd.recurrenceType === "weekdays" ? (cmd.weekdays ?? null) : null,
+      estimatedMinutes: cmd.estimatedMinutes ?? null,
     });
   } catch (error) {
     if (

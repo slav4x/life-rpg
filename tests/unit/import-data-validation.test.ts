@@ -18,6 +18,26 @@ describe("content pack validation", () => {
     expect(contentPackSchema.safeParse(base).success).toBe(true);
   });
 
+  it("accepts template duration and rejects values outside 1–1440", () => {
+    const template = {
+      title: "Фокус",
+      skillKey: "focus",
+      baseXp: 20,
+      difficulty: "normal",
+      recurrenceType: "daily",
+      estimatedMinutes: 25,
+    } as const;
+    expect(
+      contentPackSchema.safeParse({ ...base, taskTemplates: [template] }).success,
+    ).toBe(true);
+    expect(
+      contentPackSchema.safeParse({
+        ...base,
+        taskTemplates: [{ ...template, estimatedMinutes: 0 }],
+      }).success,
+    ).toBe(false);
+  });
+
   it("rejects duplicate skill keys and unresolved references", () => {
     const result = contentPackSchema.safeParse({
       ...base,

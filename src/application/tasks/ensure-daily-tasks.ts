@@ -36,6 +36,7 @@ export async function ensureTasksForDate(
       localDate,
       baseXp: t.baseXp,
       difficulty: t.difficulty,
+      estimatedMinutes: t.estimatedMinutes,
     })),
   );
 }

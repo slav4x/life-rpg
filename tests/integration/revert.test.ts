@@ -132,9 +132,22 @@ describe.skipIf(!url)("revert & concurrency (integration)", () => {
       .where(eq(tasks.templateId, template.id))
       .orderBy(asc(tasks.localDate));
 
-    await completeTask({ userId, taskId: dayTasks[0].id, idempotencyKey: "a" }, db);
+    await completeTask(
+      {
+        userId,
+        taskId: dayTasks[0].id,
+        idempotencyKey: "a",
+        todayLocalDate: dayTasks[1].localDate,
+      },
+      db,
+    );
     const second = await completeTask(
-      { userId, taskId: dayTasks[1].id, idempotencyKey: "b" },
+      {
+        userId,
+        taskId: dayTasks[1].id,
+        idempotencyKey: "b",
+        todayLocalDate: dayTasks[1].localDate,
+      },
       db,
     );
     expect(second.streak?.current).toBe(2);

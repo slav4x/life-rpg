@@ -34,6 +34,7 @@ export const taskTemplates = pgTable("task_templates", {
   recurrenceType: text("recurrence_type").notNull(),
   // ISO weekdays (1=Mon .. 7=Sun) when recurrenceType is "weekdays".
   weekdays: smallint("weekdays").array(),
+  estimatedMinutes: integer("estimated_minutes"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -47,6 +48,10 @@ export const taskTemplates = pgTable("task_templates", {
   check(
     "task_templates_difficulty_check",
     sql`${table.difficulty} in ('easy', 'normal', 'hard', 'epic')`,
+  ),
+  check(
+    "task_templates_estimated_minutes_check",
+    sql`${table.estimatedMinutes} is null or ${table.estimatedMinutes} between 1 and 1440`,
   ),
   check(
     "task_templates_recurrence_check",

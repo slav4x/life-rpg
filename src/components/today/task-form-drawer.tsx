@@ -166,6 +166,7 @@ export function TaskFormDrawer({
             weekdays: recurrence === "weekdays" ? weekdays : undefined,
             localDate: date,
             description: description.trim() || undefined,
+            estimatedMinutes: estimatedMinutes ?? undefined,
           }),
         });
       } else {

@@ -63,6 +63,7 @@ describe.skipIf(!url)("ensureTasksForDate (integration)", () => {
       baseXp: 20,
       difficulty: "normal",
       recurrenceType: "daily",
+      estimatedMinutes: 15,
     });
 
     await Promise.all([
@@ -77,6 +78,7 @@ describe.skipIf(!url)("ensureTasksForDate (integration)", () => {
       .where(and(eq(tasks.userId, userId), eq(tasks.localDate, DATE)));
     expect(rows).toHaveLength(1);
     expect(rows[0].templateId).toBe(template.id);
+    expect(rows[0].estimatedMinutes).toBe(15);
   });
 
   it("only creates weekday templates on matching days", async () => {

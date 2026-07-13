@@ -26,6 +26,7 @@ export async function GET() {
       difficulty: t.difficulty,
       recurrenceType: t.recurrenceType,
       weekdays: t.weekdays,
+      estimatedMinutes: t.estimatedMinutes,
       isActive: t.isActive,
       archivedAt: t.archivedAt,
     })),

@@ -12,6 +12,7 @@ export interface CreateTemplateInput {
   difficulty: string;
   recurrenceType: string;
   weekdays?: number[] | null;
+  estimatedMinutes?: number | null;
 }
 
 export async function createTemplate(
@@ -29,6 +30,7 @@ export async function createTemplate(
       difficulty: input.difficulty,
       recurrenceType: input.recurrenceType,
       weekdays: input.weekdays ?? null,
+      estimatedMinutes: input.estimatedMinutes ?? null,
     })
     .returning();
   return template;
@@ -84,6 +86,7 @@ export interface UpdateTemplateFields {
   difficulty?: string;
   recurrenceType?: string;
   weekdays?: number[] | null;
+  estimatedMinutes?: number | null;
   isActive?: boolean;
 }
 

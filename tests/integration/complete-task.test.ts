@@ -133,4 +133,46 @@ describe.skipIf(!url)("completeTask (integration)", () => {
     expect(result.xp.global).toBe(65);
     expect(result.xp.attribute).toBe(16);
   });
+
+  it("rejects future tasks and tasks older than seven days", async () => {
+    const future = await createTask(db, {
+      userId,
+      skillId: bodySkillId,
+      title: "Будущая",
+      localDate: "2026-07-14",
+      baseXp: 20,
+      difficulty: "normal",
+    });
+    await expect(
+      completeTask(
+        {
+          userId,
+          taskId: future.id,
+          idempotencyKey: "future",
+          todayLocalDate: "2026-07-13",
+        },
+        db,
+      ),
+    ).rejects.toMatchObject({ code: "task_date_future" });
+
+    const old = await createTask(db, {
+      userId,
+      skillId: bodySkillId,
+      title: "Старая",
+      localDate: "2026-07-05",
+      baseXp: 20,
+      difficulty: "normal",
+    });
+    await expect(
+      completeTask(
+        {
+          userId,
+          taskId: old.id,
+          idempotencyKey: "old",
+          todayLocalDate: "2026-07-13",
+        },
+        db,
+      ),
+    ).rejects.toMatchObject({ code: "task_date_too_old" });
+  });
 });

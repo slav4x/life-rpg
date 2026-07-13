@@ -63,9 +63,9 @@ export async function getProgressData(
 
   const [dailyRaw, completedTasks, attributes, recent, streaks, templates] =
     await Promise.all([
-      xpByLocalDate(db, userId, timezone, from),
-      countCompletionsFrom(db, userId, from),
-      attributeDistribution(db, userId, from),
+      xpByLocalDate(db, userId, timezone, from, today),
+      countCompletionsFrom(db, userId, from, today),
+      attributeDistribution(db, userId, from, today),
       listRecentXpEvents(db, userId, 15),
       listStreaks(db, userId),
       listTemplates(db, userId),

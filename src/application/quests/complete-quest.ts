@@ -5,6 +5,7 @@ import {
 } from "@/application/quests/award-completion";
 import { getDb, type Database } from "@/db/client";
 import { listSteps } from "@/db/repositories/quest-steps";
+import { findActiveQuestCompletion } from "@/db/repositories/quest-completions";
 import { lockQuest } from "@/db/repositories/quests";
 import { computeQuestProgress } from "@/domain/game/quest";
 
@@ -23,8 +24,17 @@ export async function completeQuest(
     if (!quest) throw new GameError("quest_not_found", "Quest not found");
 
     if (quest.status === "completed") {
+      const completion = await findActiveQuestCompletion(
+        tx,
+        cmd.userId,
+        quest.id,
+      );
+      if (!completion) {
+        throw new GameError("nothing_to_revert", "Quest completion is missing");
+      }
       return {
         questId: quest.id,
+        completionId: completion.id,
         alreadyCompleted: true,
         rewardXp: quest.rewardXp,
         levelUp: null,

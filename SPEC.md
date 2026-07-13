@@ -376,6 +376,7 @@ draft → active → completed
 - навык;
 - сложность;
 - базовый XP;
+- необязательная длительность в минутах;
 - повторение: нет / ежедневно / выбранные дни недели;
 - необязательное описание.
 
@@ -703,6 +704,7 @@ base_xp               integer not null
 difficulty            text not null
 recurrence_type       text not null
 weekdays              smallint[] null
+estimated_minutes     integer null
 is_active             boolean not null default true
 created_at            timestamptz not null
 updated_at            timestamptz not null
@@ -720,6 +722,8 @@ weekdays
 `normal`, `hard`, `epic`. Для `daily` поле `weekdays` должно быть `null`, для
 `weekdays` — содержать от 1 до 7 ISO-дней из диапазона `1–7`. Название неархивного
 шаблона уникально для пользователя без учёта регистра и пробелов по краям.
+`estimated_minutes`, если задано, ограничено диапазоном `1–1440` и переносится
+в каждую материализованную задачу.
 
 ### `tasks`
 
@@ -769,7 +773,7 @@ local_date            date not null
 final_xp              integer not null
 reverted_at           timestamptz null
 created_at            timestamptz not null
-unique (user_id, task_id)
+unique (user_id, task_id) where reverted_at is null
 unique (user_id, idempotency_key)
 ```
 
@@ -793,6 +797,22 @@ updated_at            timestamptz not null
 
 Допустимые типы квеста: `main`, `side`, `long_term`; статусы: `draft`, `active`,
 `completed`, `archived`; награда ограничена диапазоном `0–10000 XP`.
+
+### `quest_completions`
+
+```text
+id                    uuid primary key
+user_id               uuid references users(id) on delete cascade
+quest_id              uuid references quests(id) on delete cascade
+reward_xp             integer not null
+completed_at          timestamptz not null
+reverted_at           timestamptz null
+created_at            timestamptz not null
+unique (user_id, quest_id) where reverted_at is null
+```
+
+Завершения квестов хранятся отдельно от текущего статуса квеста. Это позволяет
+идемпотентно отменять завершение и повторно завершать тот же квест без удаления истории.
 
 ### `quest_steps`
 
@@ -943,6 +963,18 @@ primary key (user_id, achievement_id)
 
 Полученные достижения в MVP можно оставить открытыми после отмены, но это поведение должно быть явно задокументировано в интерфейсе и тестах.
 
+Эта же модель применяется к квестам: активное завершение помечается отменённым,
+квест возвращается в `active`, а награда компенсируется отрицательной XP-транзакцией.
+Шаги и уже открытые достижения сохраняются.
+
+### Политика дат выполнения
+
+Будущую задачу нельзя завершить заранее. Выполнение задним числом разрешено для
+сегодняшней даты и семи предыдущих локальных календарных дней пользователя. XP,
+история дня и серия учитывают исходную `local_date` задачи. Статистика дополнительно
+ограничивается текущей локальной датой, чтобы старые некорректные записи из будущего
+не попадали в итог периода.
+
 ## 12. Создание ежедневных задач без cron
 
 При запросе экрана **«Сегодня»** сервер выполняет `ensureTasksForDate(userId, localDate)`.
@@ -998,6 +1030,7 @@ POST   /api/quests
 GET    /api/quests/:id
 PATCH  /api/quests/:id
 POST   /api/quests/:id/complete
+POST   /api/quests/:id/revert
 POST   /api/quest-steps/:id/toggle
 
 GET    /api/progress?period=7d|30d|all

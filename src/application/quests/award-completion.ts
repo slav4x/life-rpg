@@ -3,12 +3,14 @@ import {
   type UnlockedAchievement,
 } from "@/application/game/check-achievements";
 import type { DbClient } from "@/db/client";
+import { createQuestCompletion } from "@/db/repositories/quest-completions";
 import { markQuestCompleted } from "@/db/repositories/quests";
 import { insertXpTransactions, sumGlobalXp } from "@/db/repositories/xp";
 import type { Quest } from "@/db/schema";
 import { calculateLevel } from "@/domain/game/calculate-level";
 
 export interface QuestCompletionOutcome {
+  completionId: string;
   rewardXp: number;
   levelUp: { from: number; to: number } | null;
   unlockedAchievements: UnlockedAchievement[];
@@ -27,6 +29,11 @@ export async function awardQuestCompletion(
   const totalBefore = await sumGlobalXp(db, userId);
 
   await markQuestCompleted(db, quest.id);
+  const completion = await createQuestCompletion(db, {
+    userId,
+    questId: quest.id,
+    rewardXp: quest.rewardXp,
+  });
 
   if (quest.rewardXp > 0) {
     await insertXpTransactions(db, [
@@ -35,7 +42,7 @@ export async function awardQuestCompletion(
         amount: quest.rewardXp,
         scope: "global",
         sourceType: "quest_completion",
-        sourceId: quest.id,
+        sourceId: completion.id,
         attributeId: quest.attributeId,
         skillId: null,
         baseXp: quest.rewardXp,
@@ -49,6 +56,7 @@ export async function awardQuestCompletion(
   const unlockedAchievements = await checkAchievements(db, userId, quest.id);
 
   return {
+    completionId: completion.id,
     rewardXp: quest.rewardXp,
     levelUp: levelAfter > levelBefore ? { from: levelBefore, to: levelAfter } : null,
     unlockedAchievements,

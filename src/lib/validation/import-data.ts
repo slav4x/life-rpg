@@ -46,6 +46,7 @@ const templateRow = z.object({
   difficulty: z.string(),
   recurrenceType: z.string(),
   weekdays: z.array(z.number().int()).nullable(),
+  estimatedMinutes: z.number().int().min(1).max(1440).nullable().default(null),
   isActive: z.boolean(),
   createdAt: timestamp,
   updatedAt: timestamp,
@@ -125,6 +126,16 @@ const questStepRow = z.object({
   updatedAt: timestamp,
 });
 
+const questCompletionRow = z.object({
+  id: uuid,
+  userId: uuid,
+  questId: uuid,
+  rewardXp: z.number().int().min(0),
+  completedAt: timestamp,
+  revertedAt: nullableTimestamp,
+  createdAt: timestamp,
+});
+
 const streakRow = z.object({
   id: uuid,
   userId: uuid,
@@ -160,6 +171,7 @@ export const backupImportSchema = z.object({
   taskCompletions: z.array(completionRow).max(50000),
   xpTransactions: z.array(xpRow).max(150000),
   quests: z.array(questRow).max(5000),
+  questCompletions: z.array(questCompletionRow).max(50000).default([]),
   questSteps: z.array(questStepRow).max(50000),
   streaks: z.array(streakRow).max(5000),
   userAchievements: z.array(
@@ -190,6 +202,7 @@ const packTemplate = z
     difficulty,
     recurrenceType,
     weekdays: z.array(z.number().int().min(1).max(7)).min(1).max(7).optional(),
+    estimatedMinutes: z.number().int().min(1).max(1440).optional(),
   })
   .refine(
     (value) => value.recurrenceType !== "weekdays" || Boolean(value.weekdays),

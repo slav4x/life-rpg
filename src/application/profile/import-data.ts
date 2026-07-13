@@ -119,6 +119,11 @@ async function foreignIdConflicts(
       and(inArray(schema.taskCompletions.id, backup.taskCompletions.map((row) => row.id)), ne(schema.taskCompletions.userId, userId)),
     ),
   );
+  addCheck("Завершения квестов", backup.questCompletions.map((row) => row.id), () =>
+    db.select({ id: schema.questCompletions.id }).from(schema.questCompletions).where(
+      and(inArray(schema.questCompletions.id, backup.questCompletions.map((row) => row.id)), ne(schema.questCompletions.userId, userId)),
+    ),
+  );
   addCheck("XP", backup.xpTransactions.map((row) => row.id), () =>
     db.select({ id: schema.xpTransactions.id }).from(schema.xpTransactions).where(
       and(inArray(schema.xpTransactions.id, backup.xpTransactions.map((row) => row.id)), ne(schema.xpTransactions.userId, userId)),
@@ -138,6 +143,7 @@ function validateBackupReferences(backup: BackupImport): string[] {
     ...duplicateIds(backup.taskCompletions, "Завершения"),
     ...duplicateIds(backup.xpTransactions, "XP"),
     ...duplicateIds(backup.quests, "Квесты"),
+    ...duplicateIds(backup.questCompletions, "Завершения квестов"),
     ...duplicateIds(backup.questSteps, "Шаги квестов"),
     ...duplicateIds(backup.streaks, "Серии"),
     ...duplicateNames(
@@ -172,6 +178,11 @@ function validateBackupReferences(backup: BackupImport): string[] {
   for (const row of backup.questSteps) {
     if (!questIds.has(row.questId)) conflicts.push(`Шаг «${row.title}»: неизвестный квест`);
   }
+  for (const row of backup.questCompletions) {
+    if (!questIds.has(row.questId)) {
+      conflicts.push(`Завершение квеста ${row.id}: неизвестный квест`);
+    }
+  }
   for (const row of backup.tasks) {
     if (!skillIds.has(row.skillId)) conflicts.push(`Задача «${row.title}»: неизвестный навык`);
     if (row.templateId && !templateIds.has(row.templateId)) conflicts.push(`Задача «${row.title}»: неизвестный шаблон`);
@@ -194,6 +205,7 @@ function validateBackupReferences(backup: BackupImport): string[] {
 async function clearUserData(db: DbClient, userId: string): Promise<void> {
   await db.delete(schema.userAchievements).where(eq(schema.userAchievements.userId, userId));
   await db.delete(schema.xpTransactions).where(eq(schema.xpTransactions.userId, userId));
+  await db.delete(schema.questCompletions).where(eq(schema.questCompletions.userId, userId));
   await db.delete(schema.taskCompletions).where(eq(schema.taskCompletions.userId, userId));
   await db.delete(schema.tasks).where(eq(schema.tasks.userId, userId));
   await db.delete(schema.streaks).where(eq(schema.streaks.userId, userId));
@@ -215,6 +227,19 @@ export async function importBackup(
     throw new DataImportError("invalid_format", "Неподдерживаемый формат экспорта");
   }
   const backup = parsed.data;
+  if (backup.questCompletions.length === 0) {
+    backup.questCompletions = backup.quests
+      .filter((quest) => quest.status === "completed")
+      .map((quest) => ({
+        id: quest.id,
+        userId: quest.userId,
+        questId: quest.id,
+        rewardXp: quest.rewardXp,
+        completedAt: quest.completedAt ?? quest.updatedAt,
+        revertedAt: null,
+        createdAt: quest.completedAt ?? quest.updatedAt,
+      }));
+  }
   if (!replace && (await hasUserData(db, userId))) {
     throw new DataImportError("account_not_empty", "В профиле уже есть данные");
   }
@@ -270,6 +295,11 @@ export async function importBackup(
           userId,
           attributeId: row.attributeId ? mapAttribute(row.attributeId) : null,
         })),
+      );
+    }
+    if (backup.questCompletions.length > 0) {
+      await tx.insert(schema.questCompletions).values(
+        backup.questCompletions.map((row) => ({ ...row, userId })),
       );
     }
     if (backup.questSteps.length > 0) await tx.insert(schema.questSteps).values(backup.questSteps);
@@ -447,6 +477,7 @@ export async function importContentPack(
       existing.difficulty === template.difficulty &&
       existing.recurrenceType === template.recurrenceType &&
       sameArray(existing.weekdays, template.weekdays) &&
+      existing.estimatedMinutes === (template.estimatedMinutes ?? null) &&
       existing.archivedAt === null
     ) {
       skippedTemplates += 1;
@@ -524,6 +555,7 @@ export async function importContentPack(
         difficulty: template.difficulty,
         recurrenceType: template.recurrenceType,
         weekdays: template.recurrenceType === "weekdays" ? template.weekdays : null,
+        estimatedMinutes: template.estimatedMinutes ?? null,
       });
     }
     for (const quest of questsToCreate) {

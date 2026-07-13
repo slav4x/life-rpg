@@ -98,13 +98,19 @@ describe.skipIf(!url)("edit & cancel task (integration)", () => {
       .from(tasks)
       .where(eq(tasks.templateId, template.id));
 
-    await editTask(userId, task.id, { baseXp: 55, scope: "future" }, db);
+    await editTask(
+      userId,
+      task.id,
+      { baseXp: 55, estimatedMinutes: 25, scope: "future" },
+      db,
+    );
 
     const [t] = await db
       .select()
       .from(taskTemplates)
       .where(eq(taskTemplates.id, template.id));
     expect(t.baseXp).toBe(55);
+    expect(t.estimatedMinutes).toBe(25);
   });
 
   it("deletes a one-off task but cancels a template task", async () => {

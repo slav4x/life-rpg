@@ -6,6 +6,7 @@ export * from "./skills";
 export * from "./user-skills";
 export * from "./quests";
 export * from "./quest-steps";
+export * from "./quest-completions";
 export * from "./task-templates";
 export * from "./tasks";
 export * from "./task-completions";
