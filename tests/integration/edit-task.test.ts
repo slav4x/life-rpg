@@ -77,6 +77,50 @@ describe.skipIf(!url)("edit & cancel task (integration)", () => {
     expect(row.baseXp).toBe(40);
   });
 
+  it("limits daily focus to three tasks and frees a slot on completion", async () => {
+    const focusedTasks = await Promise.all([
+      oneOff(),
+      oneOff(),
+      oneOff(),
+      oneOff(),
+    ]);
+
+    for (const task of focusedTasks.slice(0, 3)) {
+      await editTask(userId, task.id, { focused: true }, db);
+    }
+    await expect(
+      editTask(userId, focusedTasks[3].id, { focused: true }, db),
+    ).rejects.toMatchObject({ code: "task_focus_limit", status: 409 });
+
+    const rowsBefore = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.userId, userId));
+    expect(
+      rowsBefore
+        .map((task) => task.focusPosition)
+        .filter((position) => position != null)
+        .sort(),
+    ).toEqual([1, 2, 3]);
+
+    await completeTask(
+      {
+        userId,
+        taskId: focusedTasks[1].id,
+        idempotencyKey: "focus-completion",
+        todayLocalDate: DATE,
+      },
+      db,
+    );
+    await editTask(userId, focusedTasks[3].id, { focused: true }, db);
+
+    const [replacement] = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.id, focusedTasks[3].id));
+    expect(replacement.focusPosition).toBe(2);
+  });
+
   it("refuses to edit a completed task", async () => {
     const task = await oneOff();
     await completeTask({ userId, taskId: task.id, idempotencyKey: "a" }, db);

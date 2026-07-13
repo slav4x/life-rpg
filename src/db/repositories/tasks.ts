@@ -256,6 +256,30 @@ export interface UpdateTaskFields {
   difficulty?: string;
   priority?: string;
   estimatedMinutes?: number | null;
+  focusPosition?: number | null;
+}
+
+/** Focus positions already occupied by pending tasks for a local day. */
+export async function listTaskFocusPositions(
+  db: DbClient,
+  userId: string,
+  localDate: string,
+): Promise<number[]> {
+  const rows = await db
+    .select({ position: tasks.focusPosition })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.userId, userId),
+        eq(tasks.localDate, localDate),
+        eq(tasks.status, "pending"),
+        sql`${tasks.focusPosition} is not null`,
+      ),
+    )
+    .orderBy(asc(tasks.focusPosition));
+  return rows.flatMap((row) =>
+    row.position == null ? [] : [row.position],
+  );
 }
 
 export async function updateTask(
@@ -381,6 +405,10 @@ export async function setTaskStatus(
 ): Promise<void> {
   await db
     .update(tasks)
-    .set({ status, updatedAt: new Date() })
+    .set({
+      status,
+      focusPosition: status === "pending" ? undefined : null,
+      updatedAt: new Date(),
+    })
     .where(eq(tasks.id, taskId));
 }

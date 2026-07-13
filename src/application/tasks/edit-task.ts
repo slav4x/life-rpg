@@ -1,3 +1,5 @@
+import { sql } from "drizzle-orm";
+
 import { GameError } from "@/application/game/errors";
 import { getDb, type Database, type DbClient } from "@/db/client";
 import { getSkillById } from "@/db/repositories/skills";
@@ -5,6 +7,7 @@ import { updateTemplate } from "@/db/repositories/task-templates";
 import {
   deleteTask,
   getTaskById,
+  listTaskFocusPositions,
   setTaskStatus,
   updateTask,
   updateFuturePendingTasksFromTemplate,
@@ -22,6 +25,7 @@ export interface EditTaskCommand {
   difficulty?: string;
   priority?: string;
   estimatedMinutes?: number | null;
+  focused?: boolean;
   /** "future" also updates the source template for upcoming days (SPEC §6.3). */
   scope?: "this" | "future";
 }
@@ -58,6 +62,25 @@ export async function editTask(
     }
     await assertEditableSkill(tx, userId, cmd.skillId);
 
+    let focusPosition: number | null | undefined;
+    if (cmd.focused !== undefined) {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`${userId}:${task.localDate}`}, 0))`,
+      );
+      if (cmd.focused && task.focusPosition == null) {
+        const occupied = new Set(
+          await listTaskFocusPositions(tx, userId, task.localDate),
+        );
+        const available = [1, 2, 3].find((position) => !occupied.has(position));
+        if (!available) {
+          throw new GameError("task_focus_limit", "Daily focus limit reached");
+        }
+        focusPosition = available;
+      } else if (!cmd.focused) {
+        focusPosition = null;
+      }
+    }
+
     const fields: UpdateTaskFields = {
       title: cmd.title,
       description: cmd.description,
@@ -67,6 +90,7 @@ export async function editTask(
       difficulty: cmd.difficulty,
       priority: cmd.priority,
       estimatedMinutes: cmd.estimatedMinutes,
+      focusPosition,
     };
 
     if (cmd.scope === "future" && task.templateId) {

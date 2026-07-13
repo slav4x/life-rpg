@@ -6,6 +6,7 @@ export type GameErrorCode =
   | "task_not_overdue"
   | "task_reschedule_past"
   | "task_scope_invalid"
+  | "task_focus_limit"
   | "nothing_to_revert"
   | "template_not_found"
   | "quest_not_found"
@@ -45,6 +46,7 @@ export class GameError extends Error {
       case "task_not_overdue":
       case "task_reschedule_past":
       case "task_scope_invalid":
+      case "task_focus_limit":
       case "nothing_to_revert":
       case "quest_not_active":
       case "quest_steps_incomplete":

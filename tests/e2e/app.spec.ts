@@ -17,7 +17,7 @@ test("logs in via dev bypass and shows the Today screen", async ({ page }) => {
   expect(viewport).not.toContain("maximum-scale=1");
 
   const addButton = await page
-    .getByRole("button", { name: "Добавить" })
+    .getByRole("button", { name: "Добавить", exact: true })
     .boundingBox();
   expect(addButton?.width).toBeGreaterThanOrEqual(44);
   expect(addButton?.height).toBeGreaterThanOrEqual(44);
@@ -82,7 +82,7 @@ test("creates a one-off action", async ({ page }) => {
     timeout: 15000,
   });
 
-  await page.getByRole("button", { name: "Добавить" }).click();
+  await page.getByRole("button", { name: "Добавить", exact: true }).click();
   await page.getByLabel("Название").fill(title);
   await page
     .getByRole("dialog", { name: "Новое действие" })
@@ -92,14 +92,89 @@ test("creates a one-off action", async ({ page }) => {
   const task = page.getByRole("listitem").filter({ hasText: title });
   await expect(task).toBeVisible();
   await task.getByRole("button", { name: "Готово" }).click();
+  await page.getByLabel("Показывать завершённые задачи").click();
   await task.getByRole("button", { name: "Отменить" }).click();
   await expect(
     page.getByText("Уже открытые достижения останутся полученными."),
   ).toBeVisible();
   await page.getByRole("button", { name: "Назад" }).click();
+  await page.reload();
+  await expect(page.getByLabel("Показывать завершённые задачи")).toBeChecked();
+  await expect(task).toBeVisible();
   await page.getByRole("link", { name: "Прогресс" }).click();
   await expect(page.getByText(title)).toBeVisible();
   await expect(page.getByText(/^Действие ·/).first()).toBeVisible();
+});
+
+test("selects up to three focus tasks and shows planned duration", async ({
+  page,
+}) => {
+  const base = new Date("2030-01-01T00:00:00Z");
+  base.setUTCDate(base.getUTCDate() + (Date.now() % 2_000_000));
+  const date = base.toISOString().slice(0, 10);
+  const suffix = Date.now();
+  const titles = [0, 1, 2, 3].map((index) => `E2E фокус ${index} ${suffix}`);
+
+  await page.goto(`/?date=${date}`);
+  await expect(page.getByRole("heading", { name: "Планирование" })).toBeVisible({
+    timeout: 15000,
+  });
+  const taskIds = await page.evaluate(
+    async ({ titles, date }) => {
+      const skillsResponse = await fetch("/api/skills");
+      const skills = (await skillsResponse.json()) as {
+        skills: Array<{ id: string }>;
+      };
+      const skillId = skills.skills[0]?.id;
+      if (!skillId) throw new Error("No active skill for focus E2E");
+      const ids: string[] = [];
+      for (const [index, title] of titles.entries()) {
+        const response = await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            title,
+            skillId,
+            localDate: date,
+            baseXp: 20,
+            difficulty: "normal",
+            estimatedMinutes: 15 + index * 5,
+          }),
+        });
+        if (!response.ok) throw new Error(`Task create failed: ${response.status}`);
+        const result = (await response.json()) as { task: { id: string } };
+        ids.push(result.task.id);
+      }
+      return ids;
+    },
+    { titles, date },
+  );
+
+  await page.reload();
+  await expect(page.getByText(/^План: 1 ч 30 мин/)).toBeVisible();
+  for (const title of titles.slice(0, 3)) {
+    await page
+      .getByRole("listitem")
+      .filter({ hasText: title })
+      .getByRole("button", { name: "Добавить в фокус дня" })
+      .click();
+  }
+  const focusSection = page
+    .getByRole("heading", { name: /Фокус дня/ })
+    .locator("..").locator("..");
+  await expect(page.getByRole("heading", { name: /Фокус дня 3 \/ 3/ })).toBeVisible();
+  await expect(focusSection.getByText("1 ч", { exact: true })).toBeVisible();
+
+  await page
+    .getByRole("listitem")
+    .filter({ hasText: titles[3] })
+    .getByRole("button", { name: "Добавить в фокус дня" })
+    .click();
+  await expect(page.getByText("В фокусе дня уже выбраны три задачи.")).toBeVisible();
+
+  await page.evaluate(async (ids) => {
+    await Promise.all(ids.map((id) => fetch(`/api/tasks/${id}`, { method: "DELETE" })));
+  }, taskIds);
 });
 
 test("sets task priority and filters long lists", async ({ page }) => {
@@ -109,7 +184,7 @@ test("sets task priority and filters long lists", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /Привет/ })).toBeVisible({
     timeout: 15000,
   });
-  await page.getByRole("button", { name: "Добавить" }).click();
+  await page.getByRole("button", { name: "Добавить", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Новое действие" });
   await dialog.getByLabel("Название").fill(title);
   await dialog.getByLabel("Приоритет").click();
@@ -140,7 +215,11 @@ test("bulk-reschedules overdue tasks and pauses a recurring debt", async ({
   await expect(page.getByRole("heading", { name: /Привет/ })).toBeVisible({
     timeout: 15000,
   });
-  const today = await page.getByLabel("Перейти к дате").inputValue();
+  const dateInput = page.getByLabel("Перейти к дате");
+  if (!(await dateInput.isVisible())) {
+    await page.getByRole("button", { name: /^Планирование/ }).click();
+  }
+  const today = await dateInput.inputValue();
   const yesterdayDate = new Date(`${today}T00:00:00Z`);
   yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
   const yesterday = yesterdayDate.toISOString().slice(0, 10);
@@ -464,7 +543,7 @@ test("creates, edits, archives and links a quest step to a task", async ({ page 
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Добавить в задачи" }).click();
-  await page.getByRole("button", { name: "Добавить" }).click();
+  await page.getByRole("button", { name: "Добавить", exact: true }).click();
   await expect(page.getByText(/Задача на .* · в работе/)).toBeVisible();
 
   await page.getByRole("button", { name: "Архивировать" }).first().click();

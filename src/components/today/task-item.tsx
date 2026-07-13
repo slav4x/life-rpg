@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Flame, Pencil } from "lucide-react";
+import { Check, Flame, Pencil, Star } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -39,10 +39,12 @@ export function TaskItem({
   task,
   date,
   skills,
+  compact = false,
 }: {
   task: TaskVM;
   date: string;
   skills: SkillOption[];
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -115,8 +117,37 @@ export function TaskItem({
     }
   }
 
+  async function toggleFocus() {
+    setLoading(true);
+    const focused = task.focusPosition == null;
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ focused }),
+      });
+      if (!res.ok) {
+        toast.error(
+          await getApiErrorMessage(res, "Не удалось изменить фокус дня."),
+        );
+        return;
+      }
+      toast.success(focused ? "Добавлено в фокус дня" : "Убрано из фокуса дня");
+      router.refresh();
+    } catch {
+      toast.error(NETWORK_ERROR_MESSAGE);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <li className="flex items-center gap-3 rounded-xl border bg-card px-3 py-2.5">
+    <li
+      className={cn(
+        "flex items-center gap-3 rounded-xl border bg-card px-3 py-2.5",
+        compact && "border-primary/25 bg-primary/5 py-2",
+      )}
+    >
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span
           className={cn(
@@ -192,6 +223,29 @@ export function TaskItem({
         </div>
       ) : (
         <div className="flex shrink-0 items-center gap-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            className={cn(
+              "text-muted-foreground",
+              task.focusPosition != null && "text-primary",
+            )}
+            aria-label={
+              task.focusPosition == null
+                ? "Добавить в фокус дня"
+                : "Убрать из фокуса дня"
+            }
+            aria-pressed={task.focusPosition != null}
+            onClick={toggleFocus}
+            disabled={loading}
+          >
+            <Star
+              className={cn(
+                "size-4",
+                task.focusPosition != null && "fill-current",
+              )}
+            />
+          </Button>
           <TaskFormDrawer
             date={date}
             skills={skills}

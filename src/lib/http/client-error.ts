@@ -15,6 +15,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   task_not_overdue: "Задача уже не является просроченной.",
   task_reschedule_past: "Перенесите задачу на сегодня или будущую дату.",
   task_scope_invalid: "Действие «эта и будущие» доступно только для повторения.",
+  task_focus_limit: "В фокусе дня уже выбраны три задачи.",
   nothing_to_revert: "У задачи нет активного выполнения для отмены.",
   template_not_found: "Шаблон не найден или уже удалён.",
   quest_not_found: "Квест не найден или уже удалён.",

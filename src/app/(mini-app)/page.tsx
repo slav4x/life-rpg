@@ -72,6 +72,7 @@ export default async function TodayPage({
       status: task.status,
       finalXp: calculateFinalXp(task.baseXp, difficulty),
       estimatedMinutes: task.estimatedMinutes,
+      focusPosition: task.focusPosition,
       templateId: task.templateId,
       questStepId: task.questStepId,
       streak: task.templateId
@@ -82,6 +83,7 @@ export default async function TodayPage({
 
   return (
     <TodayScreen
+      key={data.date}
       userName={user.firstName}
       date={data.date}
       today={today}

@@ -1,0 +1,3 @@
+ALTER TABLE "tasks" ADD COLUMN "focus_position" integer;--> statement-breakpoint
+CREATE UNIQUE INDEX "tasks_user_date_focus_position_unique" ON "tasks" USING btree ("user_id","local_date","focus_position") WHERE "tasks"."focus_position" is not null and "tasks"."status" = 'pending';--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_focus_position_check" CHECK ("tasks"."focus_position" is null or "tasks"."focus_position" between 1 and 3);

@@ -12,6 +12,7 @@ export interface TaskVM {
   status: string;
   finalXp: number;
   estimatedMinutes: number | null;
+  focusPosition: number | null;
   templateId: string | null;
   questStepId: string | null;
   /** Current streak for template tasks; null for one-off tasks. */

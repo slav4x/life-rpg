@@ -27,6 +27,7 @@ export const updateTaskInputSchema = z
     difficulty: difficulty.optional(),
     priority: priority.optional(),
     estimatedMinutes: estimatedMinutesSchema.nullable().optional(),
+    focused: z.boolean().optional(),
     // "this" edits the task; "future" also updates its template (SPEC §6.3).
     scope: z.enum(["this", "future"]).optional(),
   })

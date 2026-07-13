@@ -43,6 +43,7 @@ export const tasks = pgTable(
     priority: text("priority").notNull().default("normal"),
     status: text("status").notNull().default("pending"),
     estimatedMinutes: integer("estimated_minutes"),
+    focusPosition: integer("focus_position"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -68,6 +69,10 @@ export const tasks = pgTable(
       "tasks_estimated_minutes_check",
       sql`${table.estimatedMinutes} is null or ${table.estimatedMinutes} between 1 and 1440`,
     ),
+    check(
+      "tasks_focus_position_check",
+      sql`${table.focusPosition} is null or ${table.focusPosition} between 1 and 3`,
+    ),
     // One template task per user per day (SPEC §10, §12).
     uniqueIndex("tasks_user_date_template_unique")
       .on(table.userId, table.localDate, table.templateId)
@@ -76,6 +81,11 @@ export const tasks = pgTable(
       .on(table.questStepId)
       .where(
         sql`${table.questStepId} is not null and ${table.status} <> 'cancelled'`,
+      ),
+    uniqueIndex("tasks_user_date_focus_position_unique")
+      .on(table.userId, table.localDate, table.focusPosition)
+      .where(
+        sql`${table.focusPosition} is not null and ${table.status} = 'pending'`,
       ),
   ],
 );
