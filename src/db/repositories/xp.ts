@@ -21,7 +21,7 @@ export async function insertXpTransactions(
   await db.insert(xpTransactions).values(rows);
 }
 
-export async function listRecentTransactions(
+async function listRecentTransactions(
   db: DbClient,
   userId: string,
   limit = 20,

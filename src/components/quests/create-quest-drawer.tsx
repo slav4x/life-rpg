@@ -1,13 +1,12 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Pencil, Plus, X } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { showAchievementToasts } from "@/components/achievements/achievement-toast";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Drawer,
   DrawerClose,
@@ -35,14 +34,10 @@ import {
 } from "@/lib/http/client-error";
 
 import type { QuestAttributeOption } from "./types";
-
-interface QuestFormStep {
-  key: string;
-  id?: string;
-  title: string;
-  description: string;
-  isRequired: boolean;
-}
+import {
+  QuestStepsEditor,
+  type QuestFormStep,
+} from "./quest-steps-editor";
 
 export interface QuestEditVM {
   id: string;
@@ -347,89 +342,13 @@ export function QuestFormDrawer({
               />
             </div>
 
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <Label>Шаги</Label>
-                <span className="text-xs text-muted-foreground">{steps.length}/30</span>
-              </div>
-              {steps.map((step, index) => (
-                <div
-                  key={step.key}
-                  className="flex flex-col gap-2 rounded-xl border bg-card p-3"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="flex-1 text-xs font-medium text-muted-foreground">
-                      Шаг {index + 1}
-                    </span>
-                    <label className="flex items-center gap-1.5 text-xs">
-                      <Checkbox
-                        checked={step.isRequired}
-                        onCheckedChange={(checked) =>
-                          updateStep(index, { isRequired: checked === true })
-                        }
-                      />
-                      Обязательный
-                    </label>
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label="Поднять шаг"
-                      disabled={index === 0}
-                      onClick={() => moveStep(index, -1)}
-                    >
-                      <ArrowUp className="size-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label="Опустить шаг"
-                      disabled={index === steps.length - 1}
-                      onClick={() => moveStep(index, 1)}
-                    >
-                      <ArrowDown className="size-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label="Удалить шаг"
-                      disabled={steps.length === 1}
-                      onClick={() => removeStep(index)}
-                    >
-                      <X className="size-4" />
-                    </Button>
-                  </div>
-                  <Input
-                    value={step.title}
-                    maxLength={200}
-                    placeholder="Название шага"
-                    onChange={(event) => updateStep(index, { title: event.target.value })}
-                  />
-                  <Textarea
-                    value={step.description}
-                    maxLength={2000}
-                    rows={2}
-                    placeholder="Описание шага (необязательно)"
-                    onChange={(event) =>
-                      updateStep(index, { description: event.target.value })
-                    }
-                  />
-                </div>
-              ))}
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className="self-start"
-                disabled={steps.length >= 30}
-                onClick={addStep}
-              >
-                <Plus className="size-4" />
-                Добавить шаг
-              </Button>
-            </div>
+            <QuestStepsEditor
+              steps={steps}
+              onUpdate={updateStep}
+              onMove={moveStep}
+              onRemove={removeStep}
+              onAdd={addStep}
+            />
           </div>
 
           <DrawerFooter>

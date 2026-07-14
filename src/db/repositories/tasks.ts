@@ -390,14 +390,6 @@ export async function countPendingTasksByDateThrough(
   return rows.map((row) => ({ date: row.date, count: Number(row.count) }));
 }
 
-export async function deleteTask(
-  db: DbClient,
-  userId: string,
-  id: string,
-): Promise<void> {
-  await db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.userId, userId)));
-}
-
 export async function setTaskStatus(
   db: DbClient,
   taskId: string,

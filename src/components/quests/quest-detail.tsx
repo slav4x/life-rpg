@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, ArrowLeft, CalendarPlus, Play, RotateCcw } from "lucide-react";
+import { Archive, ArrowLeft, Play, RotateCcw } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import type { CompleteQuestResult } from "@/application/quests/complete-quest";
 import type { ToggleStepResult } from "@/application/quests/toggle-step";
 import { showAchievementToasts } from "@/components/achievements/achievement-toast";
-import { TaskFormDrawer } from "@/components/today/task-form-drawer";
 import type { SkillOption } from "@/components/today/types";
 import {
   AlertDialog,
@@ -23,7 +22,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { QUEST_TYPES } from "@/domain/game/quest";
 import {
@@ -33,6 +31,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { QuestFormDrawer } from "./create-quest-drawer";
+import { QuestStepsList } from "./quest-steps-list";
 import type { QuestAttributeOption, QuestDetailVM, StepVM } from "./types";
 
 const typeLabel = (type: string) =>
@@ -318,68 +317,15 @@ export function QuestDetail({
         )}
       </header>
 
-      <ul className="flex flex-col gap-2">
-        {steps.map((step) => (
-          <li
-            key={step.id}
-            className="flex items-start gap-3 rounded-xl border bg-card px-3 py-2.5"
-          >
-            <Checkbox
-              className="mt-0.5"
-              checked={step.completed}
-              disabled={busy || !isActive}
-              onCheckedChange={() => toggle(step.id)}
-            />
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <div className="flex items-start gap-2">
-                <span
-                  className={cn(
-                    "flex-1 text-sm",
-                    step.completed && "text-muted-foreground line-through",
-                  )}
-                >
-                  {step.title}
-                </span>
-                {!step.isRequired && (
-                  <Badge variant="outline" className="font-normal">
-                    необязательный
-                  </Badge>
-                )}
-              </div>
-              {step.description && (
-                <p className="text-xs text-muted-foreground">{step.description}</p>
-              )}
-              {step.task ? (
-                <p className="text-xs text-muted-foreground">
-                  Задача на {formatDate(step.task.localDate)} ·{" "}
-                  {step.task.status === "completed" ? "выполнена" : "в работе"}
-                </p>
-              ) : (
-                isActive &&
-                !step.completed &&
-                skills.length > 0 && (
-                  <TaskFormDrawer
-                    date={today}
-                    skills={skills}
-                    preset={{
-                      title: step.title,
-                      description: step.description,
-                      questStepId: step.id,
-                      skillId: defaultSkill?.id,
-                    }}
-                    trigger={
-                      <Button size="sm" variant="outline" className="self-start">
-                        <CalendarPlus className="size-4" />
-                        Добавить в задачи
-                      </Button>
-                    }
-                  />
-                )
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
+      <QuestStepsList
+        steps={steps}
+        skills={skills}
+        today={today}
+        defaultSkillId={defaultSkill?.id}
+        busy={busy}
+        active={isActive}
+        onToggle={toggle}
+      />
 
       {isCompleted ? (
         <AlertDialog>

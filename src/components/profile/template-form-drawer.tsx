@@ -14,32 +14,16 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { BASE_XP, DIFFICULTIES, TASK_PRIORITIES } from "@/domain/game/constants";
+  ActionCoreFields,
+  ActionDescriptionField,
+  RecurrenceFields,
+  type RecurrenceValue,
+} from "@/components/tasks/action-form-fields";
 import {
   getApiErrorMessage,
   NETWORK_ERROR_MESSAGE,
 } from "@/lib/http/client-error";
-import { cn } from "@/lib/utils";
-
-const WEEKDAYS = [
-  { iso: 1, label: "Пн" },
-  { iso: 2, label: "Вт" },
-  { iso: 3, label: "Ср" },
-  { iso: 4, label: "Чт" },
-  { iso: 5, label: "Пт" },
-  { iso: 6, label: "Сб" },
-  { iso: 7, label: "Вс" },
-];
 
 export interface TemplateEditVM {
   id: string;
@@ -74,7 +58,9 @@ export function TemplateFormDrawer({
   const [difficulty, setDifficulty] = useState(template.difficulty);
   const [priority, setPriority] = useState(template.priority);
   const [baseXp, setBaseXp] = useState(String(template.baseXp));
-  const [recurrence, setRecurrence] = useState(template.recurrenceType);
+  const [recurrence, setRecurrence] = useState<RecurrenceValue>(
+    template.recurrenceType === "weekdays" ? "weekdays" : "daily",
+  );
   const [weekdays, setWeekdays] = useState<number[]>(template.weekdays ?? []);
   const [description, setDescription] = useState(template.description ?? "");
   const [minutes, setMinutes] = useState(
@@ -151,156 +137,41 @@ export function TemplateFormDrawer({
           </DrawerHeader>
 
           <div className="flex flex-col gap-4 px-4 pb-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="tpl-title">Название</Label>
-              <Input
-                id="tpl-title"
-                value={title}
-                maxLength={200}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-            </div>
+            <ActionCoreFields
+              idPrefix="tpl"
+              title={title}
+              onTitleChange={setTitle}
+              skills={skills}
+              skillId={skillId}
+              onSkillChange={setSkillId}
+              difficulty={difficulty}
+              onDifficultyChange={setDifficulty}
+              priority={priority}
+              onPriorityChange={setPriority}
+              baseXp={baseXp}
+              onBaseXpChange={setBaseXp}
+              minutes={minutes}
+              onMinutesChange={setMinutes}
+              priorityLabel="Приоритет задач"
+            />
 
-            <div className="flex flex-col gap-1.5">
-              <Label>Навык</Label>
-              <Select value={skillId} onValueChange={setSkillId}>
-                <SelectTrigger aria-label="Навык">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {skills.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <RecurrenceFields
+              idPrefix="tpl"
+              recurrence={recurrence}
+              onRecurrenceChange={setRecurrence}
+              weekdays={weekdays}
+              onToggleWeekday={toggleWeekday}
+              startsOn={startsOn}
+              onStartsOnChange={setStartsOn}
+              endsOn={endsOn}
+              onEndsOnChange={setEndsOn}
+            />
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <Label>Сложность</Label>
-                <Select value={difficulty} onValueChange={setDifficulty}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DIFFICULTIES.map((d) => (
-                      <SelectItem key={d.value} value={d.value}>
-                        {d.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="tpl-xp">Базовый XP</Label>
-                <Input
-                  id="tpl-xp"
-                  type="number"
-                  inputMode="numeric"
-                  min={BASE_XP.min}
-                  max={BASE_XP.max}
-                  value={baseXp}
-                  onChange={(e) => setBaseXp(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label>Приоритет задач</Label>
-              <Select value={priority} onValueChange={setPriority}>
-                <SelectTrigger aria-label="Приоритет задач">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TASK_PRIORITIES.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label>Повторение</Label>
-              <Select value={recurrence} onValueChange={setRecurrence}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">Каждый день</SelectItem>
-                  <SelectItem value="weekdays">По дням недели</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {recurrence === "weekdays" && (
-              <div className="flex flex-wrap gap-1.5">
-                {WEEKDAYS.map((d) => (
-                  <button
-                    key={d.iso}
-                    type="button"
-                    onClick={() => toggleWeekday(d.iso)}
-                    className={cn(
-                      "size-11 rounded-lg border text-sm transition-colors motion-reduce:transition-none",
-                      weekdays.includes(d.iso)
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "bg-background hover:bg-muted",
-                    )}
-                  >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="tpl-starts-on">Начало</Label>
-                <Input
-                  id="tpl-starts-on"
-                  type="date"
-                  value={startsOn}
-                  onChange={(e) => setStartsOn(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="tpl-ends-on">Окончание</Label>
-                <Input
-                  id="tpl-ends-on"
-                  type="date"
-                  min={startsOn}
-                  value={endsOn}
-                  onChange={(e) => setEndsOn(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="tpl-minutes">Длительность, мин (необязательно)</Label>
-              <Input
-                id="tpl-minutes"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={1440}
-                value={minutes}
-                onChange={(e) => setMinutes(e.target.value)}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="tpl-desc">Описание (необязательно)</Label>
-              <Textarea
-                id="tpl-desc"
-                value={description}
-                maxLength={2000}
-                rows={2}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
+            <ActionDescriptionField
+              idPrefix="tpl"
+              description={description}
+              onDescriptionChange={setDescription}
+            />
           </div>
 
           <DrawerFooter>

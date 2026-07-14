@@ -19,29 +19,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+  ActionCoreFields,
+  ActionDescriptionField,
+  RecurrenceFields,
+  type RecurrenceValue,
+} from "@/components/tasks/action-form-fields";
 import { calculateFinalXp } from "@/domain/game/calculate-xp";
-import {
-  BASE_XP,
-  DIFFICULTIES,
-  isDifficulty,
-  TASK_PRIORITIES,
-} from "@/domain/game/constants";
+import { BASE_XP, isDifficulty } from "@/domain/game/constants";
 import {
   getApiErrorMessage,
   NETWORK_ERROR_MESSAGE,
 } from "@/lib/http/client-error";
-import { cn } from "@/lib/utils";
 
 import type { SkillOption } from "./types";
-
-type Recurrence = "none" | "daily" | "weekdays";
 
 export interface TaskEditVM {
   id: string;
@@ -63,16 +53,6 @@ export interface TaskPreset {
   skillId?: string;
 }
 
-const WEEKDAYS = [
-  { iso: 1, label: "Пн" },
-  { iso: 2, label: "Вт" },
-  { iso: 3, label: "Ср" },
-  { iso: 4, label: "Чт" },
-  { iso: 5, label: "Пт" },
-  { iso: 6, label: "Сб" },
-  { iso: 7, label: "Вс" },
-];
-
 export function TaskFormDrawer({
   date,
   skills,
@@ -86,7 +66,7 @@ export function TaskFormDrawer({
   task?: TaskEditVM;
   preset?: TaskPreset;
   trigger?: ReactNode;
-  initialRecurrence?: Recurrence;
+  initialRecurrence?: RecurrenceValue;
 }) {
   const router = useRouter();
   const isEdit = Boolean(task);
@@ -108,7 +88,8 @@ export function TaskFormDrawer({
   const [description, setDescription] = useState(
     task?.description ?? preset?.description ?? "",
   );
-  const [recurrence, setRecurrence] = useState<Recurrence>(initialRecurrence);
+  const [recurrence, setRecurrence] =
+    useState<RecurrenceValue>(initialRecurrence);
   const [weekdays, setWeekdays] = useState<number[]>([]);
   const [scope, setScope] = useState<"this" | "future">("this");
 
@@ -266,156 +247,37 @@ export function TaskFormDrawer({
           </DrawerHeader>
 
           <div className="flex flex-col gap-4 px-4 pb-2">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="task-title">Название</Label>
-              <Input
-                id="task-title"
-                value={title}
-                maxLength={200}
-                placeholder="Например, тренировка 40 минут"
-                onChange={(e) => setTitle(e.target.value)}
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label>Навык</Label>
-              <Select value={skillId} onValueChange={setSkillId}>
-                <SelectTrigger aria-label="Навык">
-                  <SelectValue placeholder="Выберите навык" />
-                </SelectTrigger>
-                <SelectContent>
-                  {skills.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <Label>Сложность</Label>
-                <Select value={difficulty} onValueChange={setDifficulty}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DIFFICULTIES.map((d) => (
-                      <SelectItem key={d.value} value={d.value}>
-                        {d.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="task-xp">Базовый XP</Label>
-                <Input
-                  id="task-xp"
-                  type="number"
-                  inputMode="numeric"
-                  min={BASE_XP.min}
-                  max={BASE_XP.max}
-                  value={baseXp}
-                  onChange={(e) => setBaseXp(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Приоритет</Label>
-              <Select value={priority} onValueChange={setPriority}>
-                <SelectTrigger aria-label="Приоритет">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TASK_PRIORITIES.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <p className="-mt-2 text-xs text-muted-foreground">
-              ≈ {previewXp} XP за выполнение · рекомендуется {BASE_XP.min}–{BASE_XP.max}.
-            </p>
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="task-min">Длительность, мин (необязательно)</Label>
-              <Input
-                id="task-min"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={1440}
-                value={minutes}
-                placeholder="например, 40"
-                onChange={(e) => setMinutes(e.target.value)}
-              />
-            </div>
+            <ActionCoreFields
+              idPrefix="task"
+              title={title}
+              onTitleChange={setTitle}
+              skills={skills}
+              skillId={skillId}
+              onSkillChange={setSkillId}
+              difficulty={difficulty}
+              onDifficultyChange={setDifficulty}
+              priority={priority}
+              onPriorityChange={setPriority}
+              baseXp={baseXp}
+              onBaseXpChange={setBaseXp}
+              minutes={minutes}
+              onMinutesChange={setMinutes}
+              previewXp={previewXp}
+            />
 
             {!isEdit && !preset && (
-              <div className="flex flex-col gap-1.5">
-                <Label>Повторение</Label>
-                <Select
-                  value={recurrence}
-                  onValueChange={(v) => setRecurrence(v as Recurrence)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Нет</SelectItem>
-                    <SelectItem value="daily">Каждый день</SelectItem>
-                    <SelectItem value="weekdays">По дням недели</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {!isEdit && !preset && recurrence === "weekdays" && (
-              <div className="flex flex-wrap gap-1.5">
-                {WEEKDAYS.map((d) => (
-                  <button
-                    key={d.iso}
-                    type="button"
-                    onClick={() => toggleWeekday(d.iso)}
-                    className={cn(
-                      "size-11 rounded-lg border text-sm transition-colors motion-reduce:transition-none",
-                      weekdays.includes(d.iso)
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "bg-background hover:bg-muted",
-                    )}
-                  >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {!isEdit && !preset && recurrence !== "none" && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="task-starts-on">Начало</Label>
-                  <Input
-                    id="task-starts-on"
-                    type="date"
-                    value={localDate}
-                    onChange={(e) => setLocalDate(e.target.value)}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="task-ends-on">Окончание</Label>
-                  <Input
-                    id="task-ends-on"
-                    type="date"
-                    min={localDate}
-                    value={endsOn}
-                    onChange={(e) => setEndsOn(e.target.value)}
-                  />
-                </div>
-              </div>
+              <RecurrenceFields
+                idPrefix="task"
+                recurrence={recurrence}
+                onRecurrenceChange={setRecurrence}
+                weekdays={weekdays}
+                onToggleWeekday={toggleWeekday}
+                startsOn={localDate}
+                onStartsOnChange={setLocalDate}
+                endsOn={endsOn}
+                onEndsOnChange={setEndsOn}
+                allowNone
+              />
             )}
 
             {(isEdit || recurrence === "none") && (
@@ -454,16 +316,11 @@ export function TaskFormDrawer({
               </div>
             )}
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="task-desc">Описание (необязательно)</Label>
-              <Textarea
-                id="task-desc"
-                value={description}
-                maxLength={2000}
-                rows={2}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
+            <ActionDescriptionField
+              idPrefix="task"
+              description={description}
+              onDescriptionChange={setDescription}
+            />
           </div>
 
           <DrawerFooter>

@@ -66,6 +66,59 @@ test("bottom navigation reaches every screen", async ({ page }) => {
   ).toHaveClass(/text-foreground/);
 });
 
+test("read API keeps its documented response contract", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Привет/ })).toBeVisible({
+    timeout: 15000,
+  });
+
+  const responses = await page.evaluate(async () => {
+    const endpoints = [
+      "/api/profile",
+      "/api/skills",
+      "/api/quests",
+      "/api/task-templates",
+      "/api/progress?period=7d",
+      "/api/xp-transactions?limit=5",
+      "/api/achievements",
+    ];
+    return Promise.all(
+      endpoints.map(async (endpoint) => {
+        const response = await fetch(endpoint);
+        return {
+          endpoint,
+          status: response.status,
+          body: (await response.json()) as Record<string, unknown>,
+        };
+      }),
+    );
+  });
+
+  for (const response of responses) {
+    expect(response.status, response.endpoint).toBe(200);
+  }
+  expect(responses.find(({ endpoint }) => endpoint === "/api/profile")?.body)
+    .toHaveProperty("user");
+  expect(responses.find(({ endpoint }) => endpoint === "/api/skills")?.body)
+    .toHaveProperty("skills");
+  expect(responses.find(({ endpoint }) => endpoint === "/api/quests")?.body)
+    .toHaveProperty("quests");
+  expect(
+    responses.find(({ endpoint }) => endpoint === "/api/task-templates")?.body,
+  ).toHaveProperty("templates");
+  expect(
+    responses.find(({ endpoint }) => endpoint.startsWith("/api/progress?"))?.body,
+  ).toHaveProperty("week");
+  expect(
+    responses.find(({ endpoint }) =>
+      endpoint.startsWith("/api/xp-transactions?"),
+    )?.body,
+  ).toHaveProperty("events");
+  expect(
+    responses.find(({ endpoint }) => endpoint === "/api/achievements")?.body,
+  ).toHaveProperty("achievements");
+});
+
 test("saves next-week focus from the weekly review", async ({ page }) => {
   const focus = `E2E фокус недели ${Date.now()}`;
 

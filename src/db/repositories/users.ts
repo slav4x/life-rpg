@@ -37,14 +37,6 @@ export async function upsertUserFromTelegram(
   return user;
 }
 
-export async function findUserById(
-  db: Database,
-  id: string,
-): Promise<User | undefined> {
-  const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
-  return user;
-}
-
 export interface UpdateUserFields {
   timezone?: string;
   theme?: string;
