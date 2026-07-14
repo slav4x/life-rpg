@@ -59,6 +59,27 @@ test("bottom navigation reaches every screen", async ({ page }) => {
   await expect(page.getByText("Выполните первое действие")).toBeVisible();
 });
 
+test("saves next-week focus from the weekly review", async ({ page }) => {
+  const focus = `E2E фокус недели ${Date.now()}`;
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Привет/ })).toBeVisible({
+    timeout: 15000,
+  });
+  await page.getByRole("link", { name: "Прогресс" }).click();
+  await expect(page.getByRole("heading", { name: "Недельный обзор" })).toBeVisible({
+    timeout: 15000,
+  });
+  await page.getByLabel("Фокус следующей недели").fill(focus);
+  await page.getByRole("button", { name: "Сохранить фокус" }).click();
+  await expect(page.getByText("Фокус следующей недели сохранён")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Фокус следующей недели")).toHaveValue(focus);
+  await expect(page.getByRole("button", { name: "Задача", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Повторение", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Квест", exact: true })).toBeVisible();
+});
+
 test("keeps the selected date between sections", async ({ page }) => {
   const selectedDate = "2026-07-20";
   await page.goto(`/?date=${selectedDate}`);

@@ -98,13 +98,14 @@ function duplicateNames(
 }
 
 async function hasUserData(db: DbClient, userId: string): Promise<boolean> {
-  const [skills, tasks, quests, transactions] = await Promise.all([
+  const [skills, tasks, quests, transactions, weeklyFocuses] = await Promise.all([
     db.select({ id: schema.skills.id }).from(schema.skills).where(eq(schema.skills.userId, userId)).limit(1),
     db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.userId, userId)).limit(1),
     db.select({ id: schema.quests.id }).from(schema.quests).where(eq(schema.quests.userId, userId)).limit(1),
     db.select({ id: schema.xpTransactions.id }).from(schema.xpTransactions).where(eq(schema.xpTransactions.userId, userId)).limit(1),
+    db.select({ id: schema.weeklyFocuses.id }).from(schema.weeklyFocuses).where(eq(schema.weeklyFocuses.userId, userId)).limit(1),
   ]);
-  return skills.length + tasks.length + quests.length + transactions.length > 0;
+  return skills.length + tasks.length + quests.length + transactions.length + weeklyFocuses.length > 0;
 }
 
 async function foreignIdConflicts(
@@ -170,6 +171,11 @@ async function foreignIdConflicts(
       and(inArray(schema.xpTransactions.id, backup.xpTransactions.map((row) => row.id)), ne(schema.xpTransactions.userId, userId)),
     ),
   );
+  addCheck("Недельные фокусы", backup.weeklyFocuses.map((row) => row.id), () =>
+    db.select({ id: schema.weeklyFocuses.id }).from(schema.weeklyFocuses).where(
+      and(inArray(schema.weeklyFocuses.id, backup.weeklyFocuses.map((row) => row.id)), ne(schema.weeklyFocuses.userId, userId)),
+    ),
+  );
 
   return (await Promise.all(checks))
     .filter((check) => check.count > 0)
@@ -187,6 +193,7 @@ function validateBackupReferences(backup: BackupImport): string[] {
     ...duplicateIds(backup.questCompletions, "Завершения квестов"),
     ...duplicateIds(backup.questSteps, "Шаги квестов"),
     ...duplicateIds(backup.streaks, "Серии"),
+    ...duplicateIds(backup.weeklyFocuses, "Недельные фокусы"),
     ...duplicateNames(
       backup.skills.filter((row) => row.status === "active"),
       "Навык",
@@ -206,6 +213,14 @@ function validateBackupReferences(backup: BackupImport): string[] {
   const taskIds = new Set(backup.tasks.map((row) => row.id));
   const transactionIds = new Set(backup.xpTransactions.map((row) => row.id));
   const achievementIds = new Set(backup.achievementCatalog.map((row) => row.id));
+  const weeklyFocusWeeks = new Set<string>();
+
+  for (const row of backup.weeklyFocuses) {
+    if (weeklyFocusWeeks.has(row.weekStart)) {
+      conflicts.push(`Недельный фокус: повторяется неделя ${row.weekStart}`);
+    }
+    weeklyFocusWeeks.add(row.weekStart);
+  }
 
   for (const row of backup.skills) {
     if (!attributeIds.has(row.attributeId)) conflicts.push(`Навык «${row.name}»: неизвестная характеристика`);
@@ -244,6 +259,7 @@ function validateBackupReferences(backup: BackupImport): string[] {
 }
 
 async function clearUserData(db: DbClient, userId: string): Promise<void> {
+  await db.delete(schema.weeklyFocuses).where(eq(schema.weeklyFocuses.userId, userId));
   await db.delete(schema.userAchievements).where(eq(schema.userAchievements.userId, userId));
   await db.delete(schema.xpTransactions).where(eq(schema.xpTransactions.userId, userId));
   await db.delete(schema.questCompletions).where(eq(schema.questCompletions.userId, userId));
@@ -397,6 +413,11 @@ export async function importBackup(
           userId,
           achievementId: mapAchievement(row.achievementId),
         })),
+      );
+    }
+    if (backup.weeklyFocuses.length > 0) {
+      await tx.insert(schema.weeklyFocuses).values(
+        backup.weeklyFocuses.map((row) => ({ ...row, userId })),
       );
     }
     if (backup.user) {

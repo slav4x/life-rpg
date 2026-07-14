@@ -3,7 +3,6 @@ import { getDb, type Database } from "@/db/client";
 import { updateTemplate } from "@/db/repositories/task-templates";
 import {
   cancelPendingTasksFromTemplateDate,
-  deleteTask,
   lockTasksByIds,
   setTaskStatus,
   updateTask,
@@ -84,10 +83,7 @@ export async function resolveOverdueTasks(
       };
     }
 
-    for (const task of rows) {
-      if (task.templateId) await setTaskStatus(tx, task.id, "cancelled");
-      else await deleteTask(tx, userId, task.id);
-    }
+    for (const task of rows) await setTaskStatus(tx, task.id, "cancelled");
     return { affected: rows.length, pausedTemplates: 0 };
   });
 }

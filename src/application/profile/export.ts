@@ -26,6 +26,7 @@ export async function exportUserData(
     userAchievements,
     attributes,
     achievementCatalog,
+    weeklyFocuses,
   ] = await Promise.all([
     db.select().from(schema.users).where(eq(schema.users.id, userId)),
     db.select().from(schema.skills).where(eq(schema.skills.userId, userId)),
@@ -59,6 +60,10 @@ export async function exportUserData(
       .where(eq(schema.userAchievements.userId, userId)),
     db.select().from(schema.attributes),
     db.select().from(schema.achievements),
+    db
+      .select()
+      .from(schema.weeklyFocuses)
+      .where(eq(schema.weeklyFocuses.userId, userId)),
   ]);
 
   const questIds = quests.map((q) => q.id);
@@ -99,5 +104,6 @@ export async function exportUserData(
     questSteps,
     streaks,
     userAchievements,
+    weeklyFocuses,
   };
 }

@@ -331,7 +331,6 @@ draft → active → completed
 - временные эффекты;
 - предметы как реальные инструменты;
 - синергии полезных действий;
-- еженедельные обзоры;
 - AI-предложения квестов;
 - импорт данных из Health, календарей и финансовых сервисов.
 
@@ -435,9 +434,14 @@ draft → active → completed
 - суммарный XP за выбранный период;
 - выполненные задачи;
 - текущие и лучшие серии;
-- текущая/лучшая серия и число выполнений за неделю по каждому шаблону;
-- обзор текущей календарной недели: XP, выполненные и пропущенные задачи,
-  завершённые и просроченные квесты, основные направления прогресса;
+- изменение серии от состояния на начало недели, текущая и лучшая серия по каждому шаблону;
+- сравнение текущей и предыдущей календарных недель по XP, выполненным и пропущенным задачам,
+  завершённым квестам и активным сериям без оценочных формулировок;
+- пропуски: прошедшие pending- и явно отменённые/пропущенные задачи;
+- зависшие квесты: просроченные либо активные не менее 14 дней без прогресса обязательных шагов;
+- повторения с минимум двумя пропусками и долей пропусков от 40% за последние 28 дней;
+- действия разбора долгов, квестов и повторений прямо из обзора;
+- фокус следующей недели и создание задачи, повторения или квеста из review;
 - XP по дням в виде простого графика;
 - распределение XP по характеристикам;
 - последние XP-транзакции;
@@ -778,8 +782,10 @@ description           text null
 local_date            date not null
 base_xp               integer not null
 difficulty            text not null
+priority              text not null default 'normal'
 status                text not null default 'pending'
 estimated_minutes     integer null
+focus_position        integer null
 created_at            timestamptz not null
 updated_at            timestamptz not null
 ```
@@ -799,6 +805,22 @@ cancelled
 
 ```text
 (user_id, local_date, template_id) where template_id is not null
+```
+
+Отмена задачи переводит её в `cancelled`, а не удаляет физически: запись нужна для истории
+и недельного review. `focus_position` ограничена диапазоном `1–3` и уникальна для pending-задач
+пользователя на одну локальную дату.
+
+### `weekly_focuses`
+
+```text
+id                    uuid primary key
+user_id               uuid references users(id) on delete cascade
+week_start            date not null
+focus                 text not null
+created_at            timestamptz not null
+updated_at            timestamptz not null
+unique (user_id, week_start)
 ```
 
 ### `task_completions`
@@ -1079,6 +1101,7 @@ POST   /api/quests/:id/revert
 POST   /api/quest-steps/:id/toggle
 
 GET    /api/progress?period=7d|30d|all
+PUT    /api/progress/weekly-focus
 GET    /api/xp-transactions
 GET    /api/achievements
 GET    /api/export

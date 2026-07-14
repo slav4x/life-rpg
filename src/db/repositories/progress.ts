@@ -96,31 +96,42 @@ export async function countCompletionsFrom(
 export interface WeeklyTaskSummary {
   completed: number;
   missed: number;
+  pendingMissed: number;
+  dismissedMissed: number;
 }
 
-/** Completed tasks and still-pending past tasks in the current local week. */
+/**
+ * Week outcome. A missed task is a dated occurrence whose day has passed and
+ * which is still pending or was explicitly cancelled/skipped.
+ */
 export async function weeklyTaskSummary(
   db: DbClient,
   userId: string,
   fromDate: string,
-  today: string,
+  toDate: string,
+  missedThrough: string,
 ): Promise<WeeklyTaskSummary> {
   const [row] = await db
     .select({
       completed: sql<string>`count(*) filter (where ${tasks.status} = 'completed')`,
-      missed: sql<string>`count(*) filter (where ${tasks.status} = 'pending' and ${tasks.localDate} < ${today})`,
+      pendingMissed: sql<string>`count(*) filter (where ${tasks.status} = 'pending' and ${tasks.localDate} <= ${missedThrough})`,
+      dismissedMissed: sql<string>`count(*) filter (where ${tasks.status} = 'cancelled' and ${tasks.localDate} <= ${missedThrough})`,
     })
     .from(tasks)
     .where(
       and(
         eq(tasks.userId, userId),
         gte(tasks.localDate, fromDate),
-        lte(tasks.localDate, today),
+        lte(tasks.localDate, toDate),
       ),
     );
+  const pendingMissed = Number(row?.pendingMissed ?? 0);
+  const dismissedMissed = Number(row?.dismissedMissed ?? 0);
   return {
     completed: Number(row?.completed ?? 0),
-    missed: Number(row?.missed ?? 0),
+    missed: pendingMissed + dismissedMissed,
+    pendingMissed,
+    dismissedMissed,
   };
 }
 
@@ -197,6 +208,72 @@ export async function templateCompletionCounts(
     row.templateId
       ? [{ templateId: row.templateId, count: Number(row.count) }]
       : [],
+  );
+}
+
+export interface TemplateTaskOutcome {
+  templateId: string;
+  scheduled: number;
+  missed: number;
+}
+
+/** Materialised recurring occurrences and misses in a bounded window. */
+export async function templateTaskOutcomes(
+  db: DbClient,
+  userId: string,
+  fromDate: string,
+  toDate: string,
+): Promise<TemplateTaskOutcome[]> {
+  const rows = await db
+    .select({
+      templateId: tasks.templateId,
+      scheduled: sql<string>`count(*)`,
+      missed: sql<string>`count(*) filter (where ${tasks.status} in ('pending', 'cancelled'))`,
+    })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.userId, userId),
+        isNotNull(tasks.templateId),
+        gte(tasks.localDate, fromDate),
+        lte(tasks.localDate, toDate),
+      ),
+    )
+    .groupBy(tasks.templateId);
+  return rows.flatMap((row) =>
+    row.templateId
+      ? [
+          {
+            templateId: row.templateId,
+            scheduled: Number(row.scheduled),
+            missed: Number(row.missed),
+          },
+        ]
+      : [],
+  );
+}
+
+/** Active completion dates per recurring template through a local date. */
+export async function templateCompletionDatesThrough(
+  db: DbClient,
+  userId: string,
+  throughDate: string,
+): Promise<Array<{ templateId: string; date: string }>> {
+  const rows = await db
+    .select({ templateId: tasks.templateId, date: taskCompletions.localDate })
+    .from(taskCompletions)
+    .innerJoin(tasks, eq(tasks.id, taskCompletions.taskId))
+    .where(
+      and(
+        eq(taskCompletions.userId, userId),
+        isNull(taskCompletions.revertedAt),
+        isNotNull(tasks.templateId),
+        lte(taskCompletions.localDate, throughDate),
+      ),
+    )
+    .orderBy(asc(taskCompletions.localDate));
+  return rows.flatMap((row) =>
+    row.templateId ? [{ templateId: row.templateId, date: row.date }] : [],
   );
 }
 

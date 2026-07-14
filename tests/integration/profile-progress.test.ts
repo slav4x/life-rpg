@@ -13,6 +13,7 @@ import {
 import { getProfileData } from "@/application/profile/get-profile";
 import { updateUserProfile } from "@/application/profile/update-profile";
 import { getProgressData } from "@/application/progress/get-progress";
+import { saveNextWeeklyFocus } from "@/application/progress/save-weekly-focus";
 import { completeQuest } from "@/application/quests/complete-quest";
 import { completeTask } from "@/application/tasks/complete-task";
 import { ensureAttributes, listAttributes } from "@/db/repositories/attributes";
@@ -162,6 +163,161 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
         weeklyCompletions: 1,
       }),
     );
+  });
+
+  it("compares calendar weeks and includes cancelled misses and stalled quests", async () => {
+    const weekStart = addDaysToDate(today, 1 - getIsoWeekday(today));
+    const previousWeekStart = addDaysToDate(weekStart, -7);
+    const pending = await createTask(db, {
+      userId,
+      skillId,
+      title: "Не разобрано",
+      localDate: previousWeekStart,
+      baseXp: 20,
+      difficulty: "normal",
+    });
+    const dismissed = await createTask(db, {
+      userId,
+      skillId,
+      title: "Пропущено явно",
+      localDate: addDaysToDate(previousWeekStart, 1),
+      baseXp: 20,
+      difficulty: "normal",
+    });
+    await db
+      .update(schema.tasks)
+      .set({ status: "cancelled" })
+      .where(eq(schema.tasks.id, dismissed.id));
+
+    const quest = await createQuest(db, {
+      userId,
+      title: "Квест без движения",
+      type: "main",
+      rewardXp: 100,
+      status: "active",
+    });
+    await createSteps(db, quest.id, [
+      { title: "Начать", isRequired: true, sortOrder: 0 },
+    ]);
+    await db
+      .update(schema.quests)
+      .set({ createdAt: new Date(`${addDaysToDate(today, -15)}T00:00:00Z`) })
+      .where(eq(schema.quests.id, quest.id));
+
+    const data = await getProgressData(userId, "7d", "UTC", db);
+    expect(data.week.previous).toMatchObject({
+      missedTasks: 2,
+      pendingMissedTasks: 1,
+      dismissedMissedTasks: 1,
+    });
+    expect(data.week.stalledQuests).toContainEqual(
+      expect.objectContaining({
+        id: quest.id,
+        reason: "no_progress",
+      }),
+    );
+    expect(data.week.actionableMissedTasks).toContainEqual(
+      expect.objectContaining({ id: pending.id }),
+    );
+  });
+
+  it("reports real weekly streak change and frequent recurrence misses", async () => {
+    const weekStart = addDaysToDate(today, 1 - getIsoWeekday(today));
+    const previousWeekEnd = addDaysToDate(weekStart, -1);
+    const [template] = await db
+      .insert(schema.taskTemplates)
+      .values({
+        userId,
+        skillId,
+        title: "Ежедневный обзор",
+        baseXp: 20,
+        difficulty: "normal",
+        recurrenceType: "daily",
+        startsOn: addDaysToDate(weekStart, -20),
+      })
+      .returning();
+
+    const completionDates = [
+      previousWeekEnd,
+      ...Array.from({ length: getIsoWeekday(today) }, (_, index) =>
+        addDaysToDate(weekStart, index),
+      ),
+    ];
+    for (const localDate of completionDates) {
+      const [task] = await db
+        .insert(schema.tasks)
+        .values({
+          userId,
+          templateId: template.id,
+          skillId,
+          title: template.title,
+          localDate,
+          baseXp: 20,
+          difficulty: "normal",
+        })
+        .returning();
+      await completeTask(
+        {
+          userId,
+          taskId: task.id,
+          idempotencyKey: task.id,
+          todayLocalDate: today,
+        },
+        db,
+      );
+    }
+    for (let offset = 8; offset <= 14; offset += 1) {
+      await db.insert(schema.tasks).values({
+        userId,
+        templateId: template.id,
+        skillId,
+        title: template.title,
+        localDate: addDaysToDate(weekStart, -offset),
+        baseXp: 20,
+        difficulty: "normal",
+        status: "cancelled",
+      });
+    }
+
+    const data = await getProgressData(userId, "7d", "UTC", db);
+    expect(data.templateStreaks).toContainEqual(
+      expect.objectContaining({
+        templateId: template.id,
+        weekStart: 1,
+        current: 1 + getIsoWeekday(today),
+        weeklyChange: getIsoWeekday(today),
+      }),
+    );
+    expect(data.week.activeStreaks).toBe(1);
+    expect(data.week.previous.activeStreaks).toBe(1);
+    expect(data.week.problemTemplates).toContainEqual(
+      expect.objectContaining({ id: template.id, missed: 7 }),
+    );
+  });
+
+  it("persists next-week focus and includes it in export", async () => {
+    const weekStart = addDaysToDate(today, 1 - getIsoWeekday(today));
+    const nextWeekStart = addDaysToDate(weekStart, 7);
+    await saveNextWeeklyFocus(
+      userId,
+      "UTC",
+      nextWeekStart,
+      "Закончить ключевой этап",
+      db,
+    );
+
+    const data = await getProgressData(userId, "7d", "UTC", db);
+    expect(data.nextWeek).toMatchObject({
+      from: nextWeekStart,
+      focus: "Закончить ключевой этап",
+    });
+    const exported = await exportUserData(userId, db);
+    expect(exported.weeklyFocuses).toEqual([
+      expect.objectContaining({
+        weekStart: nextWeekStart,
+        focus: "Закончить ключевой этап",
+      }),
+    ]);
   });
 
   it("excludes future-dated legacy completions from progress statistics", async () => {

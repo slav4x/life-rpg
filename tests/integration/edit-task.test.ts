@@ -223,12 +223,14 @@ describe.skipIf(!url)("edit & cancel task (integration)", () => {
     ]);
   });
 
-  it("deletes a one-off task but cancels a template task", async () => {
+  it("keeps cancelled one-off and template tasks for review history", async () => {
     const off = await oneOff();
     await cancelTask(userId, off.id, db);
-    expect(
-      await db.select().from(tasks).where(eq(tasks.id, off.id)),
-    ).toHaveLength(0);
+    const [cancelledOneOff] = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.id, off.id));
+    expect(cancelledOneOff.status).toBe("cancelled");
 
     const template = await createTemplate(db, {
       userId,
@@ -270,7 +272,7 @@ describe.skipIf(!url)("edit & cancel task (integration)", () => {
 
     await resolveOverdueTasks(
       userId,
-      addDaysToDate(DATE, 3),
+      addDaysToDate(DATE, 2),
       {
         action: "reschedule",
         taskIds: [occurrences[0].id],
@@ -306,7 +308,7 @@ describe.skipIf(!url)("edit & cancel task (integration)", () => {
     expect(moved.status).toBe("pending");
   });
 
-  it("atomically skips recurring tasks and deletes one-off overdue tasks", async () => {
+  it("atomically keeps dismissed overdue tasks as cancelled review history", async () => {
     const oneOffTask = await oneOff();
     const template = await createTemplate(db, {
       userId,
@@ -336,9 +338,11 @@ describe.skipIf(!url)("edit & cancel task (integration)", () => {
       db,
     );
 
-    expect(
-      await db.select().from(tasks).where(eq(tasks.id, oneOffTask.id)),
-    ).toHaveLength(0);
+    const [dismissedOneOff] = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.id, oneOffTask.id));
+    expect(dismissedOneOff.status).toBe("cancelled");
     const templateRows = await db
       .select()
       .from(tasks)

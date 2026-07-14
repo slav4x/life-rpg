@@ -14,3 +14,4 @@ export * from "./xp-transactions";
 export * from "./streaks";
 export * from "./achievements";
 export * from "./user-achievements";
+export * from "./weekly-focuses";

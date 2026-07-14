@@ -79,12 +79,14 @@ export function TaskFormDrawer({
   task,
   preset,
   trigger,
+  initialRecurrence = "none",
 }: {
   date: string;
   skills: SkillOption[];
   task?: TaskEditVM;
   preset?: TaskPreset;
   trigger?: ReactNode;
+  initialRecurrence?: Recurrence;
 }) {
   const router = useRouter();
   const isEdit = Boolean(task);
@@ -106,7 +108,7 @@ export function TaskFormDrawer({
   const [description, setDescription] = useState(
     task?.description ?? preset?.description ?? "",
   );
-  const [recurrence, setRecurrence] = useState<Recurrence>("none");
+  const [recurrence, setRecurrence] = useState<Recurrence>(initialRecurrence);
   const [weekdays, setWeekdays] = useState<number[]>([]);
   const [scope, setScope] = useState<"this" | "future">("this");
 
@@ -212,7 +214,7 @@ export function TaskFormDrawer({
       if (!isEdit) {
         setTitle("");
         setDescription("");
-        setRecurrence("none");
+        setRecurrence(initialRecurrence);
         setWeekdays([]);
         setEndsOn("");
       }

@@ -5,7 +5,6 @@ import { getDb, type Database, type DbClient } from "@/db/client";
 import { getSkillById } from "@/db/repositories/skills";
 import { updateTemplate } from "@/db/repositories/task-templates";
 import {
-  deleteTask,
   getTaskById,
   listTaskFocusPositions,
   setTaskStatus,
@@ -120,8 +119,7 @@ export async function editTask(
 }
 
 /**
- * Remove a pending task. Template-derived tasks are cancelled (kept so lazy
- * daily creation won't re-add them today); one-off tasks are deleted.
+ * Cancel a pending task without deleting its review/history record.
  */
 export async function cancelTask(
   userId: string,
@@ -134,9 +132,5 @@ export async function cancelTask(
     throw new GameError("task_not_pending", "Only pending tasks can be removed");
   }
 
-  if (task.templateId) {
-    await setTaskStatus(db, id, "cancelled");
-  } else {
-    await deleteTask(db, userId, id);
-  }
+  await setTaskStatus(db, id, "cancelled");
 }

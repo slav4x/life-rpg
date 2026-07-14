@@ -71,6 +71,7 @@ const taskRow = z.object({
   priority: priority.default("normal"),
   status: z.string(),
   estimatedMinutes: z.number().int().nullable(),
+  focusPosition: z.number().int().min(1).max(3).nullable().default(null),
   createdAt: timestamp,
   updatedAt: timestamp,
 });
@@ -151,6 +152,15 @@ const streakRow = z.object({
   updatedAt: timestamp,
 });
 
+const weeklyFocusRow = z.object({
+  id: uuid,
+  userId: uuid,
+  weekStart: isoDateSchema,
+  focus: z.string().max(500),
+  createdAt: timestamp,
+  updatedAt: timestamp,
+});
+
 export const backupImportSchema = z.object({
   format: z.literal("life-rpg-export"),
   formatVersion: z.literal(1),
@@ -187,6 +197,7 @@ export const backupImportSchema = z.object({
       sourceId: uuid.nullable(),
     }),
   ),
+  weeklyFocuses: z.array(weeklyFocusRow).max(1000).default([]),
 });
 
 const packSkill = z.object({
