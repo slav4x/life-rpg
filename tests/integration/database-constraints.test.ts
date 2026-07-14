@@ -7,7 +7,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ensureAttributes, listAttributes } from "@/db/repositories/attributes";
 import { createSkill } from "@/db/repositories/skills";
 import * as schema from "@/db/schema";
-import { quests, tasks, userSkills, users, xpTransactions } from "@/db/schema";
+import {
+  quests,
+  tasks,
+  taskTemplates,
+  userSkills,
+  users,
+  xpTransactions,
+} from "@/db/schema";
 
 const url = process.env.TEST_DATABASE_URL;
 
@@ -15,6 +22,15 @@ function isCheckViolation(error: unknown): boolean {
   let current: unknown = error;
   for (let depth = 0; depth < 3 && current instanceof Error; depth += 1) {
     if ((current as Error & { code?: string }).code === "23514") return true;
+    current = (current as Error & { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+function isForeignKeyViolation(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 3 && current instanceof Error; depth += 1) {
+    if ((current as Error & { code?: string }).code === "23503") return true;
     current = (current as Error & { cause?: unknown }).cause;
   }
   return false;
@@ -94,5 +110,23 @@ describe.skipIf(!url)("database domain constraints (integration)", () => {
         multiplier: "1",
       }),
     ).rejects.toSatisfy(isCheckViolation);
+  });
+
+  it("rejects a template linked to another user's skill", async () => {
+    const [otherUser] = await db
+      .insert(users)
+      .values({ telegramId: 790_000_002n, firstName: "Other" })
+      .returning();
+
+    await expect(
+      db.insert(taskTemplates).values({
+        userId: otherUser.id,
+        skillId,
+        title: "Чужая связь",
+        baseXp: 20,
+        difficulty: "normal",
+        recurrenceType: "daily",
+      }),
+    ).rejects.toSatisfy(isForeignKeyViolation);
   });
 });

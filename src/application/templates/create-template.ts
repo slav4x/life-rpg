@@ -48,26 +48,32 @@ export async function createUserTemplate(
     throw new GameError("invalid_input", "Template end date precedes start date");
   }
 
-  const skill = await getSkillById(db, cmd.userId, cmd.skillId);
-  if (!skill || skill.status !== "active") {
-    throw new GameError("skill_not_found", "Skill not found");
-  }
-
   let template: TaskTemplate;
   try {
-    template = await createTemplate(db, {
-      userId: cmd.userId,
-      skillId: cmd.skillId,
-      title: cmd.title,
-      description: cmd.description ?? null,
-      baseXp: cmd.baseXp,
-      difficulty: cmd.difficulty,
-      priority: cmd.priority ?? "normal",
-      recurrenceType: cmd.recurrenceType,
-      weekdays: cmd.recurrenceType === "weekdays" ? (cmd.weekdays ?? null) : null,
-      estimatedMinutes: cmd.estimatedMinutes ?? null,
-      startsOn: cmd.localDate,
-      endsOn: cmd.endsOn ?? null,
+    template = await db.transaction(async (tx) => {
+      const skill = await getSkillById(tx, cmd.userId, cmd.skillId);
+      if (!skill || skill.status !== "active") {
+        throw new GameError("skill_not_found", "Skill not found");
+      }
+
+      const created = await createTemplate(tx, {
+        userId: cmd.userId,
+        skillId: cmd.skillId,
+        title: cmd.title,
+        description: cmd.description ?? null,
+        baseXp: cmd.baseXp,
+        difficulty: cmd.difficulty,
+        priority: cmd.priority ?? "normal",
+        recurrenceType: cmd.recurrenceType,
+        weekdays:
+          cmd.recurrenceType === "weekdays" ? (cmd.weekdays ?? null) : null,
+        estimatedMinutes: cmd.estimatedMinutes ?? null,
+        startsOn: cmd.localDate,
+        endsOn: cmd.endsOn ?? null,
+      });
+
+      await ensureTasksForDate(cmd.userId, cmd.localDate, tx);
+      return created;
     });
   } catch (error) {
     if (
@@ -84,6 +90,5 @@ export async function createUserTemplate(
     throw error;
   }
 
-  await ensureTasksForDate(cmd.userId, cmd.localDate, db);
   return template;
 }

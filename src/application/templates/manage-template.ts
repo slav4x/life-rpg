@@ -52,6 +52,15 @@ export async function updateUserTemplate(
         }
         return restoreTemplate(tx, userId, id, normalized.title);
       }
+      if (normalized.skillId !== undefined) {
+        const skill = await getSkillById(tx, userId, normalized.skillId);
+        if (!skill) {
+          throw new GameError("skill_not_found", "Skill not found");
+        }
+        if (skill.status !== "active") {
+          throw new GameError("skill_archived", "Skill is archived");
+        }
+      }
       const startsOn = normalized.startsOn ?? current.startsOn;
       const endsOn =
         normalized.endsOn === undefined ? current.endsOn : normalized.endsOn;

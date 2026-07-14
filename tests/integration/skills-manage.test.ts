@@ -138,6 +138,101 @@ describe.skipIf(!url)("skill management (integration)", () => {
     expect(restoredTemplate.isActive).toBe(true);
   });
 
+  it("rejects moving a template to another user's or archived skill", async () => {
+    const [otherUser] = await db
+      .insert(users)
+      .values({ telegramId: 750_000_002n, firstName: "Other" })
+      .returning();
+    const otherSkill = await createSkill(db, {
+      userId: otherUser.id,
+      attributeId,
+      name: "Чужой навык",
+    });
+    const archivedSkill = await createSkill(db, {
+      userId,
+      attributeId,
+      name: "Архивный навык",
+    });
+    await archiveUserSkill(userId, archivedSkill.id, db);
+    const template = await createTemplate(db, {
+      userId,
+      skillId,
+      title: "Проверка навыка",
+      baseXp: 20,
+      difficulty: "normal",
+      recurrenceType: "daily",
+    });
+
+    await expect(
+      updateUserTemplate(userId, template.id, { skillId: otherSkill.id }, db),
+    ).rejects.toMatchObject({ code: "skill_not_found" });
+    await expect(
+      updateUserTemplate(userId, template.id, { skillId: archivedSkill.id }, db),
+    ).rejects.toMatchObject({ code: "skill_archived" });
+
+    const [unchanged] = await db
+      .select()
+      .from(taskTemplates)
+      .where(eq(taskTemplates.id, template.id));
+    expect(unchanged.skillId).toBe(skillId);
+  });
+
+  it("rolls back skill archive when template archive fails", async () => {
+    await createTemplate(db, {
+      userId,
+      skillId,
+      title: "Атомарный архив",
+      baseXp: 20,
+      difficulty: "normal",
+      recurrenceType: "daily",
+    });
+    await db.execute(
+      sql.raw(
+        "drop trigger if exists test_reject_atomic_template_archive_trigger on task_templates",
+      ),
+    );
+    await db.execute(
+      sql.raw(`
+        create or replace function test_reject_atomic_template_archive()
+        returns trigger as $$
+        begin
+          if old.title = 'Атомарный архив' and new.archived_at is not null then
+            raise exception 'forced template archive failure';
+          end if;
+          return new;
+        end;
+        $$ language plpgsql
+      `),
+    );
+    await db.execute(
+      sql.raw(`
+        create trigger test_reject_atomic_template_archive_trigger
+        before update on task_templates
+        for each row execute function test_reject_atomic_template_archive()
+      `),
+    );
+
+    try {
+      await expect(archiveUserSkill(userId, skillId, db)).rejects.toThrow();
+
+      const [unchanged] = await db
+        .select()
+        .from(skills)
+        .where(eq(skills.id, skillId));
+      expect(unchanged.status).toBe("active");
+      expect(unchanged.archivedAt).toBeNull();
+    } finally {
+      await db.execute(
+        sql.raw(
+          "drop trigger if exists test_reject_atomic_template_archive_trigger on task_templates",
+        ),
+      );
+      await db.execute(
+        sql.raw("drop function if exists test_reject_atomic_template_archive()"),
+      );
+    }
+  });
+
   it("rejects a duplicate active skill name but allows reuse after archive", async () => {
     await expect(
       createUserSkill(

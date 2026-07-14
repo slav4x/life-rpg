@@ -211,6 +211,12 @@ function validateBackupReferences(backup: BackupImport): string[] {
   const questIds = new Set(backup.quests.map((row) => row.id));
   const stepIds = new Set(backup.questSteps.map((row) => row.id));
   const taskIds = new Set(backup.tasks.map((row) => row.id));
+  const taskCompletionIds = new Set(
+    backup.taskCompletions.map((row) => row.id),
+  );
+  const questCompletionIds = new Set(
+    backup.questCompletions.map((row) => row.id),
+  );
   const transactionIds = new Set(backup.xpTransactions.map((row) => row.id));
   const achievementIds = new Set(backup.achievementCatalog.map((row) => row.id));
   const weeklyFocusWeeks = new Set<string>();
@@ -227,6 +233,11 @@ function validateBackupReferences(backup: BackupImport): string[] {
   }
   for (const row of backup.taskTemplates) {
     if (!skillIds.has(row.skillId)) conflicts.push(`Шаблон «${row.title}»: неизвестный навык`);
+  }
+  for (const row of backup.userSkills) {
+    if (!skillIds.has(row.skillId)) {
+      conflicts.push(`Прогресс навыка ${row.skillId}: неизвестный навык`);
+    }
   }
   for (const row of backup.quests) {
     if (row.attributeId && !attributeIds.has(row.attributeId)) conflicts.push(`Квест «${row.title}»: неизвестная характеристика`);
@@ -247,10 +258,30 @@ function validateBackupReferences(backup: BackupImport): string[] {
   for (const row of backup.taskCompletions) {
     if (!taskIds.has(row.taskId)) conflicts.push(`Завершение ${row.id}: неизвестная задача`);
   }
+  for (const row of backup.streaks) {
+    if (!templateIds.has(row.templateId)) {
+      conflicts.push(`Серия ${row.id}: неизвестный шаблон`);
+    }
+  }
   for (const row of backup.xpTransactions) {
     if (row.skillId && !skillIds.has(row.skillId)) conflicts.push(`XP ${row.id}: неизвестный навык`);
     if (row.attributeId && !attributeIds.has(row.attributeId)) conflicts.push(`XP ${row.id}: неизвестная характеристика`);
     if (row.reversalOfId && !transactionIds.has(row.reversalOfId)) conflicts.push(`XP ${row.id}: неизвестная исходная транзакция`);
+    if (
+      row.sourceType === "task_completion" &&
+      !taskCompletionIds.has(row.sourceId)
+    ) {
+      conflicts.push(`XP ${row.id}: неизвестное завершение задачи`);
+    }
+    if (
+      row.sourceType === "quest_completion" &&
+      !questCompletionIds.has(row.sourceId)
+    ) {
+      conflicts.push(`XP ${row.id}: неизвестное завершение квеста`);
+    }
+    if (row.sourceType === "reversal" && !transactionIds.has(row.sourceId)) {
+      conflicts.push(`XP ${row.id}: неизвестная отменяемая транзакция`);
+    }
   }
   for (const row of backup.userAchievements) {
     if (!achievementIds.has(row.achievementId)) conflicts.push(`Достижение ${row.achievementId}: нет в каталоге экспорта`);

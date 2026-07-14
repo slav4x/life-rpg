@@ -6,6 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { exportUserData } from "@/application/profile/export";
 import {
+  DataImportError,
   importBackup,
   importContentPack,
   previewContentPack,
@@ -20,6 +21,7 @@ import { ensureAttributes, listAttributes } from "@/db/repositories/attributes";
 import { createSteps, setStepCompleted } from "@/db/repositories/quest-steps";
 import { createQuest } from "@/db/repositories/quests";
 import { createSkill } from "@/db/repositories/skills";
+import { createTemplate } from "@/db/repositories/task-templates";
 import { createTask } from "@/db/repositories/tasks";
 import * as schema from "@/db/schema";
 import { skills, users } from "@/db/schema";
@@ -587,6 +589,69 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
       "После экспорта",
     );
     expect((await getProgressData(userId, "all", "UTC", db)).totalXp).toBe(50);
+  });
+
+  it("rejects malformed and incomplete backups before replacement", async () => {
+    await expect(
+      importBackup(userId, { format: "unknown" }, true, db),
+    ).rejects.toMatchObject({ code: "invalid_format" });
+
+    await completeOne(50);
+    const template = await createTemplate(db, {
+      userId,
+      skillId,
+      title: "Шаблон для серии",
+      baseXp: 20,
+      difficulty: "normal",
+      recurrenceType: "daily",
+      startsOn: today,
+    });
+    await db.insert(schema.streaks).values({
+      userId,
+      templateId: template.id,
+      currentCount: 1,
+      bestCount: 1,
+      lastCompletedDate: today,
+    });
+
+    const backup = JSON.parse(
+      JSON.stringify(await exportUserData(userId, db)),
+    ) as {
+      userSkills: Array<{ skillId: string }>;
+      streaks: Array<{ templateId: string }>;
+      xpTransactions: Array<{
+        sourceType: string;
+        sourceId: string;
+      }>;
+    };
+    backup.userSkills[0].skillId = crypto.randomUUID();
+    backup.streaks[0].templateId = crypto.randomUUID();
+    const completionXp = backup.xpTransactions.find(
+      (row) => row.sourceType === "task_completion",
+    );
+    expect(completionXp).toBeDefined();
+    completionXp!.sourceId = crypto.randomUUID();
+
+    let error: unknown;
+    try {
+      await importBackup(userId, backup, true, db);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(DataImportError);
+    expect((error as DataImportError).conflicts).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("неизвестный навык"),
+        expect.stringContaining("неизвестный шаблон"),
+        expect.stringContaining("неизвестное завершение задачи"),
+      ]),
+    );
+
+    const remainingSkills = await db
+      .select()
+      .from(skills)
+      .where(eq(skills.userId, userId));
+    expect(remainingSkills).toHaveLength(1);
   });
 
   it("rejects an invalid timezone", async () => {

@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   date,
+  foreignKey,
   integer,
   pgTable,
   smallint,
@@ -25,8 +26,7 @@ export const taskTemplates = pgTable("task_templates", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   skillId: uuid("skill_id")
-    .notNull()
-    .references(() => skills.id),
+    .notNull(),
   title: text("title").notNull(),
   description: text("description"),
   baseXp: integer("base_xp").notNull(),
@@ -71,6 +71,11 @@ export const taskTemplates = pgTable("task_templates", {
     "task_templates_recurrence_check",
     sql`(${table.recurrenceType} = 'daily' and ${table.weekdays} is null) or (${table.recurrenceType} = 'weekdays' and cardinality(${table.weekdays}) between 1 and 7 and ${table.weekdays} <@ array[1, 2, 3, 4, 5, 6, 7]::smallint[])`,
   ),
+  foreignKey({
+    columns: [table.userId, table.skillId],
+    foreignColumns: [skills.userId, skills.id],
+    name: "task_templates_user_skill_fk",
+  }),
   uniqueIndex("task_templates_user_live_title_unique")
     .on(table.userId, sql`lower(btrim(${table.title}))`)
     .where(sql`${table.archivedAt} is null`),

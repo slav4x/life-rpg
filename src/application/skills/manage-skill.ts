@@ -1,5 +1,5 @@
 import { GameError } from "@/application/game/errors";
-import { getDb, type DbClient } from "@/db/client";
+import { getDb, type Database, type DbClient } from "@/db/client";
 import { isUniqueConstraintViolation } from "@/db/errors";
 import { listAttributes } from "@/db/repositories/attributes";
 import {
@@ -82,10 +82,12 @@ export async function updateUserSkill(
 export async function archiveUserSkill(
   userId: string,
   id: string,
-  db: DbClient = getDb(),
+  db: Database = getDb(),
 ): Promise<Skill> {
-  const skill = await archiveSkill(db, userId, id);
-  if (!skill) throw new GameError("skill_not_found", "Skill not found");
-  await archiveTemplatesBySkill(db, userId, id);
-  return skill;
+  return db.transaction(async (tx) => {
+    const skill = await archiveSkill(tx, userId, id);
+    if (!skill) throw new GameError("skill_not_found", "Skill not found");
+    await archiveTemplatesBySkill(tx, userId, id);
+    return skill;
+  });
 }

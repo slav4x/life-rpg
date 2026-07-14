@@ -4,6 +4,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -37,6 +38,7 @@ export const skills = pgTable(
   },
   (table) => [
     check("skills_status_check", sql`${table.status} in ('active', 'archived')`),
+    unique("skills_user_id_id_unique").on(table.userId, table.id),
     uniqueIndex("skills_user_active_name_unique")
       .on(table.userId, sql`lower(btrim(${table.name}))`)
       .where(sql`${table.status} = 'active'`),

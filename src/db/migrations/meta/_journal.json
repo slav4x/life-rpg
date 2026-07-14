@@ -99,6 +99,13 @@
       "when": 1784013767541,
       "tag": "0013_foamy_nekra",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1784018291527,
+      "tag": "0014_jittery_the_fury",
+      "breakpoints": true
     }
   ]
 }

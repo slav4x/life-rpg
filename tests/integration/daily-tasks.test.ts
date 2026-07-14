@@ -16,7 +16,7 @@ import {
 } from "@/db/repositories/task-templates";
 import { createTask, listTasksForDate } from "@/db/repositories/tasks";
 import * as schema from "@/db/schema";
-import { tasks, users } from "@/db/schema";
+import { tasks, taskTemplates, users } from "@/db/schema";
 import { addDaysToDate, getIsoWeekday } from "@/lib/dates/local-date";
 
 const url = process.env.TEST_DATABASE_URL;
@@ -267,5 +267,61 @@ describe.skipIf(!url)("ensureTasksForDate (integration)", () => {
     expect(restored.title).toBe("Разминка");
     expect(restored.isActive).toBe(true);
     expect(restored.archivedAt).toBeNull();
+  });
+
+  it("rolls back a new template when initial task materialisation fails", async () => {
+    await db.execute(
+      sql.raw("drop trigger if exists test_reject_atomic_task_trigger on tasks"),
+    );
+    await db.execute(
+      sql.raw(`
+        create or replace function test_reject_atomic_task()
+        returns trigger as $$
+        begin
+          if new.title = 'Атомарный шаблон' then
+            raise exception 'forced task insert failure';
+          end if;
+          return new;
+        end;
+        $$ language plpgsql
+      `),
+    );
+    await db.execute(
+      sql.raw(`
+        create trigger test_reject_atomic_task_trigger
+        before insert on tasks
+        for each row execute function test_reject_atomic_task()
+      `),
+    );
+
+    try {
+      await expect(
+        createUserTemplate(
+          {
+            userId,
+            skillId,
+            title: "Атомарный шаблон",
+            baseXp: 20,
+            difficulty: "normal",
+            recurrenceType: "daily",
+            localDate: DATE,
+          },
+          db,
+        ),
+      ).rejects.toThrow();
+
+      const rows = await db
+        .select()
+        .from(taskTemplates)
+        .where(eq(taskTemplates.title, "Атомарный шаблон"));
+      expect(rows).toHaveLength(0);
+    } finally {
+      await db.execute(
+        sql.raw("drop trigger if exists test_reject_atomic_task_trigger on tasks"),
+      );
+      await db.execute(
+        sql.raw("drop function if exists test_reject_atomic_task()"),
+      );
+    }
   });
 });
