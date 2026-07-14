@@ -5,7 +5,6 @@ import {
   gte,
   isNotNull,
   isNull,
-  lt,
   lte,
   sql,
 } from "drizzle-orm";
@@ -16,7 +15,6 @@ import {
   questCompletions,
   taskCompletions,
   tasks,
-  quests,
   xpTransactions,
 } from "@/db/schema";
 
@@ -137,7 +135,6 @@ export async function weeklyTaskSummary(
 
 export interface WeeklyQuestSummary {
   completed: number;
-  overdue: Array<{ id: string; title: string; dueDate: string }>;
 }
 
 export async function weeklyQuestSummary(
@@ -148,36 +145,19 @@ export async function weeklyQuestSummary(
   today: string,
 ): Promise<WeeklyQuestSummary> {
   const completionDate = sql<string>`(${questCompletions.completedAt} at time zone ${timezone})::date`;
-  const [[completedRow], overdueRows] = await Promise.all([
-    db
-      .select({ count: sql<string>`count(*)` })
-      .from(questCompletions)
-      .where(
-        and(
-          eq(questCompletions.userId, userId),
-          isNull(questCompletions.revertedAt),
-          gte(completionDate, fromDate),
-          lte(completionDate, today),
-        ),
+  const [completedRow] = await db
+    .select({ count: sql<string>`count(*)` })
+    .from(questCompletions)
+    .where(
+      and(
+        eq(questCompletions.userId, userId),
+        isNull(questCompletions.revertedAt),
+        gte(completionDate, fromDate),
+        lte(completionDate, today),
       ),
-    db
-      .select({ id: quests.id, title: quests.title, dueDate: quests.dueDate })
-      .from(quests)
-      .where(
-        and(
-          eq(quests.userId, userId),
-          eq(quests.status, "active"),
-          isNotNull(quests.dueDate),
-          lt(quests.dueDate, today),
-        ),
-      )
-      .orderBy(asc(quests.dueDate)),
-  ]);
+    );
   return {
     completed: Number(completedRow?.count ?? 0),
-    overdue: overdueRows.flatMap((quest) =>
-      quest.dueDate ? [{ ...quest, dueDate: quest.dueDate }] : [],
-    ),
   };
 }
 

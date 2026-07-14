@@ -190,6 +190,26 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
       .update(schema.tasks)
       .set({ status: "cancelled" })
       .where(eq(schema.tasks.id, dismissed.id));
+    const completed = await createTask(db, {
+      userId,
+      skillId,
+      title: "Завершено на прошлой неделе",
+      localDate: addDaysToDate(previousWeekStart, 2),
+      baseXp: 20,
+      difficulty: "normal",
+    });
+    await db
+      .update(schema.tasks)
+      .set({ status: "completed" })
+      .where(eq(schema.tasks.id, completed.id));
+    await db.insert(schema.taskCompletions).values({
+      userId,
+      taskId: completed.id,
+      idempotencyKey: completed.id,
+      completedAt: new Date(`${addDaysToDate(previousWeekStart, 2)}T12:00:00Z`),
+      localDate: addDaysToDate(previousWeekStart, 2),
+      finalXp: 20,
+    });
 
     const quest = await createQuest(db, {
       userId,
@@ -208,6 +228,8 @@ describe.skipIf(!url)("progress, profile & export (integration)", () => {
 
     const data = await getProgressData(userId, "7d", "UTC", db);
     expect(data.week.previous).toMatchObject({
+      xp: 20,
+      completedTasks: 1,
       missedTasks: 2,
       pendingMissedTasks: 1,
       dismissedMissedTasks: 1,

@@ -14,33 +14,50 @@ export async function ensureTasksForDate(
   localDate: string,
   db: DbClient = getDb(),
 ): Promise<void> {
+  return ensureTasksForDates(userId, [localDate], db);
+}
+
+/** Materialise several local dates with one template read and one bulk insert. */
+export async function ensureTasksForDates(
+  userId: string,
+  localDates: string[],
+  db: DbClient = getDb(),
+): Promise<void> {
+  const dates = [...new Set(localDates)];
+  if (dates.length === 0) return;
+
   const templates = await listActiveTemplates(db, userId);
   if (templates.length === 0) return;
 
-  const weekday = getIsoWeekday(localDate);
-  const applicable = templates.filter(
-    (t) =>
-      t.startsOn <= localDate &&
-      (!t.endsOn || t.endsOn >= localDate) &&
-      templateAppliesOnWeekday(
-        { recurrenceType: t.recurrenceType, weekdays: t.weekdays },
-        weekday,
-      ),
-  );
-
   await insertTasksFromTemplates(
     db,
-    applicable.map((t) => ({
-      userId,
-      templateId: t.id,
-      skillId: t.skillId,
-      title: t.title,
-      description: t.description,
-      localDate,
-      baseXp: t.baseXp,
-      difficulty: t.difficulty,
-      priority: t.priority,
-      estimatedMinutes: t.estimatedMinutes,
-    })),
+    dates.flatMap((localDate) => {
+      const weekday = getIsoWeekday(localDate);
+      return templates
+        .filter(
+          (template) =>
+            template.startsOn <= localDate &&
+            (!template.endsOn || template.endsOn >= localDate) &&
+            templateAppliesOnWeekday(
+              {
+                recurrenceType: template.recurrenceType,
+                weekdays: template.weekdays,
+              },
+              weekday,
+            ),
+        )
+        .map((template) => ({
+          userId,
+          templateId: template.id,
+          skillId: template.skillId,
+          title: template.title,
+          description: template.description,
+          localDate,
+          baseXp: template.baseXp,
+          difficulty: template.difficulty,
+          priority: template.priority,
+          estimatedMinutes: template.estimatedMinutes,
+        }));
+    }),
   );
 }

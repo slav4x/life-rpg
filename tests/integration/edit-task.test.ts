@@ -121,6 +121,75 @@ describe.skipIf(!url)("edit & cancel task (integration)", () => {
     expect(replacement.focusPosition).toBe(2);
   });
 
+  it("serialises focused task moves into the target day", async () => {
+    const targetDate = addDaysToDate(DATE, 1);
+    const sourceTasks = await Promise.all([
+      createTask(db, {
+        userId,
+        skillId,
+        title: "Фокус A",
+        localDate: addDaysToDate(DATE, -1),
+        baseXp: 20,
+        difficulty: "normal",
+      }),
+      createTask(db, {
+        userId,
+        skillId,
+        title: "Фокус B",
+        localDate: DATE,
+        baseXp: 20,
+        difficulty: "normal",
+      }),
+    ]);
+    for (const task of sourceTasks) {
+      await editTask(userId, task.id, { focused: true }, db);
+    }
+
+    await Promise.all(
+      sourceTasks.map((task) =>
+        editTask(userId, task.id, { localDate: targetDate }, db),
+      ),
+    );
+
+    const moved = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.localDate, targetDate));
+    expect(
+      moved.map((task) => task.focusPosition).sort(),
+    ).toEqual([1, 2]);
+  });
+
+  it("clears implicit focus when the target day is full", async () => {
+    const targetDate = addDaysToDate(DATE, 1);
+    const source = await oneOff();
+    await editTask(userId, source.id, { focused: true }, db);
+    const occupied = await Promise.all(
+      [1, 2, 3].map((position) =>
+        createTask(db, {
+          userId,
+          skillId,
+          title: `Целевой фокус ${position}`,
+          localDate: targetDate,
+          baseXp: 20,
+          difficulty: "normal",
+        }),
+      ),
+    );
+    for (const task of occupied) {
+      await editTask(userId, task.id, { focused: true }, db);
+    }
+
+    const moved = await editTask(
+      userId,
+      source.id,
+      { localDate: targetDate },
+      db,
+    );
+    expect(moved.localDate).toBe(targetDate);
+    expect(moved.focusPosition).toBeNull();
+  });
+
   it("refuses to edit a completed task", async () => {
     const task = await oneOff();
     await completeTask({ userId, taskId: task.id, idempotencyKey: "a" }, db);

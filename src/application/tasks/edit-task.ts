@@ -61,23 +61,37 @@ export async function editTask(
     }
     await assertEditableSkill(tx, userId, cmd.skillId);
 
+    const targetDate = cmd.localDate ?? task.localDate;
+    const movesToAnotherDate = targetDate !== task.localDate;
+    const needsFocusPosition =
+      (cmd.focused === true &&
+        (task.focusPosition == null || movesToAnotherDate)) ||
+      (movesToAnotherDate &&
+        cmd.focused === undefined &&
+        task.focusPosition != null);
+
     let focusPosition: number | null | undefined;
-    if (cmd.focused !== undefined) {
+    if (needsFocusPosition) {
       await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtextextended(${`${userId}:${task.localDate}`}, 0))`,
+        sql`select pg_advisory_xact_lock(hashtextextended(${`${userId}:${targetDate}`}, 0))`,
       );
-      if (cmd.focused && task.focusPosition == null) {
-        const occupied = new Set(
-          await listTaskFocusPositions(tx, userId, task.localDate),
-        );
-        const available = [1, 2, 3].find((position) => !occupied.has(position));
-        if (!available) {
+      const occupied = new Set(
+        await listTaskFocusPositions(tx, userId, targetDate),
+      );
+      const available = [task.focusPosition, 1, 2, 3].find(
+        (position): position is number =>
+          position != null && !occupied.has(position),
+      );
+      if (!available) {
+        if (cmd.focused === true) {
           throw new GameError("task_focus_limit", "Daily focus limit reached");
         }
-        focusPosition = available;
-      } else if (!cmd.focused) {
         focusPosition = null;
+      } else {
+        focusPosition = available;
       }
+    } else if (cmd.focused === false) {
+      focusPosition = null;
     }
 
     const fields: UpdateTaskFields = {

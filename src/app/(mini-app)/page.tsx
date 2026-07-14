@@ -3,7 +3,7 @@ import { Sparkles } from "lucide-react";
 import { getAuthenticatedUser } from "@/application/auth/session";
 import { ensureWorkspace } from "@/application/game/bootstrap";
 import { getTodayData } from "@/application/game/today";
-import { ensureTasksForDate } from "@/application/tasks/ensure-daily-tasks";
+import { ensureTasksForDates } from "@/application/tasks/ensure-daily-tasks";
 import { getPlanningSummary } from "@/application/tasks/planning";
 import { TelegramLogin } from "@/components/auth/telegram-login";
 import { TodayScreen } from "@/components/today/today-screen";
@@ -48,10 +48,11 @@ export default async function TodayPage({
   const horizon = Array.from({ length: 7 }, (_, index) =>
     addDaysToDate(today, index),
   );
-  await Promise.all(horizon.map((date) => ensureTasksForDate(user.id, date)));
+  const datesToMaterialise = [...horizon];
   if (viewedDate > horizon[horizon.length - 1]) {
-    await ensureTasksForDate(user.id, viewedDate);
+    datesToMaterialise.push(viewedDate);
   }
+  await ensureTasksForDates(user.id, datesToMaterialise);
 
   const [data, planning] = await Promise.all([
     getTodayData(user.id, viewedDate),

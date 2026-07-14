@@ -4,7 +4,10 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { ensureTasksForDate } from "@/application/tasks/ensure-daily-tasks";
+import {
+  ensureTasksForDate,
+  ensureTasksForDates,
+} from "@/application/tasks/ensure-daily-tasks";
 import { getPlanningSummary } from "@/application/tasks/planning";
 import { createUserTemplate } from "@/application/templates/create-template";
 import { updateUserTemplate } from "@/application/templates/manage-template";
@@ -132,6 +135,40 @@ describe.skipIf(!url)("ensureTasksForDate (integration)", () => {
 
     const rows = await db.select().from(tasks).where(eq(tasks.userId, userId));
     expect(rows.map((row) => row.localDate).sort()).toEqual([startsOn, endsOn]);
+  });
+
+  it("materialises a date range in one idempotent batch", async () => {
+    await createTemplate(db, {
+      userId,
+      skillId,
+      title: "Пакетное повторение",
+      baseXp: 20,
+      difficulty: "normal",
+      recurrenceType: "daily",
+      startsOn: DATE,
+      endsOn: addDaysToDate(DATE, 2),
+    });
+    const dates = [
+      DATE,
+      addDaysToDate(DATE, 1),
+      addDaysToDate(DATE, 1),
+      addDaysToDate(DATE, 2),
+      addDaysToDate(DATE, 3),
+    ];
+
+    await ensureTasksForDates(userId, dates, db);
+    await ensureTasksForDates(userId, dates, db);
+
+    const rows = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.userId, userId))
+      .orderBy(tasks.localDate);
+    expect(rows.map((row) => row.localDate)).toEqual([
+      DATE,
+      addDaysToDate(DATE, 1),
+      addDaysToDate(DATE, 2),
+    ]);
   });
 
   it("summarises overdue, today and the next seven days", async () => {

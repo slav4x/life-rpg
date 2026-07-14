@@ -128,6 +128,14 @@ function sumXp(days: DailyXp[]): number {
   return days.reduce((sum, day) => sum + day.xp, 0);
 }
 
+function filterDailyRange(
+  days: DailyXp[],
+  from: string | undefined,
+  to: string,
+): DailyXp[] {
+  return days.filter((day) => (!from || day.date >= from) && day.date <= to);
+}
+
 function taskMetrics(
   from: string,
   to: string,
@@ -169,16 +177,18 @@ export async function getProgressData(
   const nextWeekStart = addDaysToDate(weekStart, 7);
   const nextWeekEnd = addDaysToDate(nextWeekStart, 6);
   const recurrenceReviewStart = addDaysToDate(today, -(RECURRENCE_REVIEW_DAYS - 1));
+  const xpRangeStart =
+    from === undefined || from <= previousWeekStart
+      ? from
+      : previousWeekStart;
 
   const [
-    dailyRaw,
+    xpRange,
     completedTasks,
     attributes,
     recent,
     streaks,
     templates,
-    currentWeekXp,
-    previousWeekXp,
     currentWeekTasks,
     previousWeekTasks,
     currentWeekQuests,
@@ -194,14 +204,12 @@ export async function getProgressData(
     activeSkills,
     questAttributes,
   ] = await Promise.all([
-    xpByLocalDate(db, userId, timezone, from, today),
+    xpByLocalDate(db, userId, timezone, xpRangeStart, today),
     countCompletionsFrom(db, userId, from, today),
     attributeDistribution(db, userId, from, today),
     listRecentXpEvents(db, userId, 15),
     listStreaks(db, userId),
     listTemplates(db, userId),
-    xpByLocalDate(db, userId, timezone, weekStart, today),
-    xpByLocalDate(db, userId, timezone, previousWeekStart, previousWeekEnd),
     weeklyTaskSummary(db, userId, weekStart, today, yesterday),
     weeklyTaskSummary(
       db,
@@ -230,6 +238,13 @@ export async function getProgressData(
     listAttributes(db),
   ]);
 
+  const dailyRaw = filterDailyRange(xpRange, from, today);
+  const currentWeekXp = filterDailyRange(xpRange, weekStart, today);
+  const previousWeekXp = filterDailyRange(
+    xpRange,
+    previousWeekStart,
+    previousWeekEnd,
+  );
   const totalXp = sumXp(dailyRaw);
   const windowStart = laterDate(
     from ?? dailyRaw[0]?.date ?? today,
