@@ -57,6 +57,13 @@ test("bottom navigation reaches every screen", async ({ page }) => {
     page.getByRole("heading", { name: "Характеристики" }),
   ).toBeVisible();
   await expect(page.getByText("Выполните первое действие")).toBeVisible();
+  await expect(page.locator("nav").getByRole("link")).toHaveCount(5);
+  await page.getByRole("link", { name: /^Повторения/ }).click();
+  await expect(page.getByRole("heading", { name: "Повторения" })).toBeVisible();
+  await expect(page.locator("nav").getByRole("link")).toHaveCount(5);
+  await expect(
+    page.locator("nav").getByRole("link", { name: "Профиль" }).locator("span"),
+  ).toHaveClass(/text-foreground/);
 });
 
 test("saves next-week focus from the weekly review", async ({ page }) => {
@@ -222,6 +229,85 @@ test("sets task priority and filters long lists", async ({ page }) => {
   await page.getByRole("link", { name: "Квесты" }).click();
   await page.getByLabel("Поиск квестов").fill("нет-такого-квеста-e2e");
   await expect(page.getByText("Нет активных квестов этого типа.")).toBeVisible();
+});
+
+test("keeps skill and quest list context in the URL and after details", async ({
+  page,
+}) => {
+  const suffix = Date.now();
+  const skillTitle = `E2E контекст навыка ${suffix}`;
+  const questTitle = `E2E контекст квеста ${suffix}`;
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Привет/ })).toBeVisible({
+    timeout: 15000,
+  });
+  await page.evaluate(
+    async ({ skillTitle, questTitle }) => {
+      const skillResponse = await fetch("/api/skills", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: skillTitle,
+          attributeCode: "creation",
+        }),
+      });
+      if (!skillResponse.ok) throw new Error(`Skill create failed: ${skillResponse.status}`);
+      const createdSkill = (await skillResponse.json()) as { skill: { id: string } };
+      const skillsResponse = await fetch("/api/skills");
+      const skills = (await skillsResponse.json()) as {
+        skills: Array<{ id: string; attributeId: string }>;
+      };
+      const attributeId = skills.skills.find(
+        (skill) => skill.id === createdSkill.skill.id,
+      )?.attributeId;
+      if (!attributeId) throw new Error("Created skill attribute is missing");
+
+      const questResponse = await fetch("/api/quests", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: questTitle,
+          type: "side",
+          attributeId,
+          rewardXp: 100,
+          steps: [{ title: "Проверить возврат", isRequired: true }],
+        }),
+      });
+      if (!questResponse.ok) throw new Error(`Quest create failed: ${questResponse.status}`);
+    },
+    { skillTitle, questTitle },
+  );
+
+  await page.getByRole("link", { name: "Навыки" }).click();
+  await page.getByLabel("Поиск навыков").fill(skillTitle);
+  await page.getByLabel("Фильтр по характеристике").click();
+  await page.getByRole("option", { name: "Созидание" }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe(skillTitle);
+  expect(new URL(page.url()).searchParams.get("attribute")).toBe("creation");
+  await page.reload();
+  await expect(page.getByLabel("Поиск навыков")).toHaveValue(skillTitle);
+  await page.getByRole("link", { name: new RegExp(skillTitle) }).click();
+  await page.getByRole("button", { name: "Навыки" }).click();
+  await expect(page.getByLabel("Поиск навыков")).toHaveValue(skillTitle);
+  expect(new URL(page.url()).searchParams.get("attribute")).toBe("creation");
+
+  await page.getByRole("link", { name: "Квесты" }).click();
+  await page.getByLabel("Поиск квестов").fill(questTitle);
+  await page.getByLabel("Фильтр по типу квеста").click();
+  await page.getByRole("option", { name: "Побочный" }).click();
+  await page.getByLabel("Фильтр квестов по характеристике").click();
+  await page.getByRole("option", { name: "Созидание" }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe(questTitle);
+  expect(new URL(page.url()).searchParams.get("type")).toBe("side");
+  expect(new URL(page.url()).searchParams.get("attribute")).toBe("Созидание");
+  await page.reload();
+  await expect(page.getByLabel("Поиск квестов")).toHaveValue(questTitle);
+  await page.getByRole("link", { name: new RegExp(questTitle) }).click();
+  await page.getByRole("button", { name: "Квесты" }).click();
+  await expect(page.getByLabel("Поиск квестов")).toHaveValue(questTitle);
+  expect(new URL(page.url()).searchParams.get("type")).toBe("side");
+  expect(new URL(page.url()).searchParams.get("attribute")).toBe("Созидание");
 });
 
 test("bulk-reschedules overdue tasks and pauses a recurring debt", async ({
@@ -423,16 +509,21 @@ test("restores an archived template after resolving a title conflict", async ({
   }, title);
 
   await page.getByRole("link", { name: "Профиль" }).click();
+  await page.getByRole("link", { name: /^Повторения/ }).click();
+  await page.getByLabel("Поиск повторений").fill(title);
+  await expect.poll(() => new URL(page.url()).searchParams.get("q")).toBe(title);
+  await page.reload();
+  await expect(page.getByLabel("Поиск повторений")).toHaveValue(title);
   await page.locator("summary").filter({ hasText: "Архив" }).click();
   const archivedCard = page
     .locator("[data-archived-template]")
     .filter({ hasText: title });
   await archivedCard.getByRole("button", { name: "Восстановить" }).click();
   await expect(
-    archivedCard.getByText("Неархивный шаблон с таким названием уже существует."),
+    archivedCard.getByText("Неархивное повторение с таким названием уже существует."),
   ).toBeVisible();
   await archivedCard
-    .getByLabel(`Новое название шаблона ${title}`)
+    .getByLabel(`Новое название повторения ${title}`)
     .fill(restoredTitle);
   await archivedCard
     .getByRole("button", { name: "Переименовать и восстановить" })
@@ -612,7 +703,8 @@ test("saves, filters and activates an overdue quest draft", async ({ page }) => 
   await page.getByLabel("Тип").click();
   await page.getByRole("option", { name: "Основной" }).click();
   await page.getByRole("tab", { name: "Завершённые" }).click();
-  await expect(page).toHaveURL(/\/quests\?tab=completed&type=main$/);
+  await expect.poll(() => new URL(page.url()).searchParams.get("tab")).toBe("completed");
+  expect(new URL(page.url()).searchParams.get("type")).toBe("main");
 });
 
 test("offers the full IANA timezone list and rolls theme back on API failure", async ({

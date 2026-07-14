@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { RotateCcw } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -40,10 +40,9 @@ export function SkillsScreen({
   archived: ArchivedSkillOverviewItem[];
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rename, setRename] = useState<{ id: string; value: string } | null>(null);
-  const [query, setQuery] = useState("");
-  const [attribute, setAttribute] = useState("all");
   const attributeOptions = [
     ...groups.map((group) => ({ code: group.code, name: group.name })),
     ...archived.map((skill) => ({
@@ -54,6 +53,14 @@ export function SkillsScreen({
     (option, index, options) =>
       option.code && options.findIndex((item) => item.code === option.code) === index,
   );
+  const query = searchParams.get("q") ?? "";
+  const requestedAttribute = searchParams.get("attribute");
+  const attribute = attributeOptions.some(
+    (option) => option.code === requestedAttribute,
+  )
+    ? requestedAttribute!
+    : "all";
+  const listQuery = searchParams.toString();
 
   const normalizedQuery = query.trim().toLocaleLowerCase("ru-RU");
   const filteredGroups = groups
@@ -70,6 +77,24 @@ export function SkillsScreen({
       (attribute === "all" || skill.attributeCode === attribute) &&
       skill.name.toLocaleLowerCase("ru-RU").includes(normalizedQuery),
   );
+
+  function replaceQuery(patch: { q?: string; attribute?: string }) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (patch.q !== undefined) {
+      if (patch.q) params.set("q", patch.q);
+      else params.delete("q");
+    }
+    if (patch.attribute !== undefined) {
+      if (patch.attribute === "all") params.delete("attribute");
+      else params.set("attribute", patch.attribute);
+    }
+    const queryString = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      queryString ? `/skills?${queryString}` : "/skills",
+    );
+  }
 
   async function restore(skill: ArchivedSkillOverviewItem, name?: string) {
     setBusyId(skill.id);
@@ -126,9 +151,12 @@ export function SkillsScreen({
           aria-label="Поиск навыков"
           placeholder="Поиск навыков"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => replaceQuery({ q: event.target.value })}
         />
-        <Select value={attribute} onValueChange={setAttribute}>
+        <Select
+          value={attribute}
+          onValueChange={(value) => replaceQuery({ attribute: value })}
+        >
           <SelectTrigger aria-label="Фильтр по характеристике" className="w-36">
             <SelectValue />
           </SelectTrigger>
@@ -159,7 +187,7 @@ export function SkillsScreen({
               {group.skills.map((skill) => (
                 <Link
                   key={skill.id}
-                  href={`/skills/${skill.id}`}
+                  href={`/skills/${skill.id}${listQuery ? `?${listQuery}` : ""}`}
                   className="flex flex-col gap-1.5 rounded-xl border bg-card px-3 py-2.5"
                 >
                   <div className="flex items-center justify-between gap-2">

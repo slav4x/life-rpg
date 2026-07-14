@@ -1,7 +1,7 @@
 "use client";
 
 import { Archive, ArrowLeft, CalendarPlus, Play, RotateCcw } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -56,6 +56,7 @@ export function QuestDetail({
   today: string;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [busy, setBusy] = useState(false);
 
   const completedCount = steps.filter((step) => step.completed).length;
@@ -77,11 +78,8 @@ export function QuestDetail({
     : undefined;
 
   function goBack() {
-    if (window.history.length > 1) {
-      router.back();
-      return;
-    }
-    router.push("/quests");
+    const query = searchParams.toString();
+    router.push(query ? `/quests?${query}` : "/quests");
   }
 
   async function toggle(stepId: string) {

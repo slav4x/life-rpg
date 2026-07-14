@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -36,14 +36,16 @@ function formatDate(iso: string): string {
 
 export function SkillDetailView({ detail }: { detail: SkillDetail }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [busy, setBusy] = useState(false);
 
+  function skillsHref() {
+    const query = searchParams.toString();
+    return query ? `/skills?${query}` : "/skills";
+  }
+
   function goBack() {
-    if (window.history.length > 1) {
-      router.back();
-      return;
-    }
-    router.push("/skills");
+    router.push(skillsHref());
   }
 
   async function archive() {
@@ -57,7 +59,7 @@ export function SkillDetailView({ detail }: { detail: SkillDetail }) {
         return;
       }
       toast.success("Навык архивирован");
-      router.push("/skills");
+      router.push(skillsHref());
     } catch {
       toast.error(NETWORK_ERROR_MESSAGE);
     } finally {

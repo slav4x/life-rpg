@@ -1,31 +1,18 @@
 "use client";
 
-import { Download, LogOut, Pencil, RotateCcw, Upload } from "lucide-react";
+import { Download, LogOut, Upload } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { type ChangeEvent, useState } from "react";
 import { toast } from "sonner";
 
-import type {
-  ProfileSkillOption,
-  ProfileTemplate,
-} from "@/application/profile/get-profile";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   getApiErrorMessage,
   NETWORK_ERROR_MESSAGE,
 } from "@/lib/http/client-error";
-
-import { TemplateFormDrawer } from "./template-form-drawer";
 
 const THEMES = [
   { value: "light", label: "Светлая" },
@@ -48,8 +35,6 @@ const TIMEZONES =
       supportedValuesOf?: (key: "timeZone") => string[];
     }
   ).supportedValuesOf?.("timeZone") ?? FALLBACK_TIMEZONES;
-
-const DAY_LABELS = ["", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
 type ImportSection = "skills" | "tasks" | "taskTemplates" | "quests";
 type ImportCounts = Record<ImportSection, number>;
@@ -87,18 +72,6 @@ const ALL_IMPORT_SECTIONS: ImportSelection = {
   quests: true,
 };
 
-function scheduleLabel(t: ProfileTemplate): string {
-  const recurrence =
-    t.recurrenceType === "daily"
-      ? "Каждый день"
-      : (t.weekdays ?? [])
-          .slice()
-          .sort((a, b) => a - b)
-          .map((d) => DAY_LABELS[d])
-          .join(", ");
-  return `${recurrence} · с ${t.startsOn}${t.endsOn ? ` до ${t.endsOn}` : ""}`;
-}
-
 async function patchProfile(body: Record<string, string>): Promise<Response> {
   return fetch("/api/profile", {
     method: "PATCH",
@@ -107,45 +80,16 @@ async function patchProfile(body: Record<string, string>): Promise<Response> {
   });
 }
 
-export function ProfileSettings({
-  timezone,
-  templates,
-  skills,
-}: {
-  timezone: string;
-  templates: ProfileTemplate[];
-  skills: ProfileSkillOption[];
-}) {
+export function ProfileSettings({ timezone }: { timezone: string }) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [tz, setTz] = useState(timezone);
   const [savedTz, setSavedTz] = useState(timezone);
   const [busy, setBusy] = useState(false);
-  const [templateRename, setTemplateRename] = useState<{
-    id: string;
-    value: string;
-  } | null>(null);
   const [pendingContentPack, setPendingContentPack] =
     useState<PendingContentPack | null>(null);
-  const [templateQuery, setTemplateQuery] = useState("");
-  const [templateSkill, setTemplateSkill] = useState("all");
 
   const timezoneOptions = TIMEZONES.includes(tz) ? TIMEZONES : [tz, ...TIMEZONES];
-  const normalizedTemplateQuery = templateQuery.trim().toLocaleLowerCase("ru-RU");
-  const templateSkillOptions = templates
-    .map((template) => ({ id: template.skillId, name: template.skillName }))
-    .filter(
-      (option, index, options) =>
-        options.findIndex((item) => item.id === option.id) === index,
-    );
-  const matchesTemplate = (template: ProfileTemplate) =>
-    (templateSkill === "all" || template.skillId === templateSkill) &&
-    `${template.title} ${template.skillName}`
-      .toLocaleLowerCase("ru-RU")
-      .includes(normalizedTemplateQuery);
-  const active = templates.filter((t) => !t.archived && matchesTemplate(t));
-  const archived = templates.filter((t) => t.archived && matchesTemplate(t));
-  const hasTemplates = templates.length > 0;
 
   async function changeTheme(next: string) {
     const previous = theme ?? "system";
@@ -182,88 +126,6 @@ export function ProfileSettings({
       }
     } catch {
       setTz(savedTz);
-      toast.error(NETWORK_ERROR_MESSAGE);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function patchTemplate(id: string, body: Record<string, unknown>) {
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/task-templates/${id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        toast.error(await getApiErrorMessage(res, "Не удалось обновить шаблон."));
-      }
-      else router.refresh();
-    } catch {
-      toast.error(NETWORK_ERROR_MESSAGE);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function archiveTemplate(id: string) {
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/task-templates/${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        toast.error(
-          await getApiErrorMessage(res, "Не удалось архивировать шаблон."),
-        );
-      }
-      else {
-        toast.success("Шаблон архивирован");
-        router.refresh();
-      }
-    } catch {
-      toast.error(NETWORK_ERROR_MESSAGE);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function restoreTemplate(template: ProfileTemplate, title?: string) {
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/task-templates/${template.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          isActive: true,
-          ...(title ? { title: title.trim() } : {}),
-        }),
-      });
-      const payload = (await res.clone().json().catch(() => ({}))) as {
-        error?: string;
-      };
-      if (!res.ok) {
-        if (payload.error === "duplicate_template") {
-          const suffix = " (восстановлен)";
-          setTemplateRename({
-            id: template.id,
-            value:
-              title?.trim() ||
-              `${template.title.slice(0, 200 - suffix.length)}${suffix}`,
-          });
-          toast.error("Название шаблона уже занято", {
-            description: "Измените название и повторите восстановление.",
-          });
-        } else {
-          toast.error(
-            await getApiErrorMessage(res, "Не удалось восстановить шаблон."),
-          );
-        }
-        return;
-      }
-      setTemplateRename(null);
-      toast.success("Шаблон восстановлен и активирован");
-      router.refresh();
-    } catch {
       toast.error(NETWORK_ERROR_MESSAGE);
     } finally {
       setBusy(false);
@@ -519,163 +381,6 @@ export function ProfileSettings({
         <p className="text-xs text-muted-foreground">
           Можно выбрать или ввести любую IANA timezone.
         </p>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium">Шаблоны задач</h2>
-        {hasTemplates && (
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-            <Input
-              type="search"
-              aria-label="Поиск шаблонов"
-              placeholder="Поиск шаблонов"
-              value={templateQuery}
-              onChange={(event) => setTemplateQuery(event.target.value)}
-            />
-            <Select value={templateSkill} onValueChange={setTemplateSkill}>
-              <SelectTrigger aria-label="Фильтр шаблонов по навыку" className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Все навыки</SelectItem>
-                {templateSkillOptions.map((skill) => (
-                  <SelectItem key={skill.id} value={skill.id}>
-                    {skill.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        {active.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {hasTemplates && (templateQuery.trim() || templateSkill !== "all")
-              ? "Активных шаблонов по вашему запросу нет."
-              : "Активных шаблонов нет."}
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {active.map((t) => (
-              <li
-                key={t.id}
-                className="flex flex-col gap-2 rounded-xl border bg-card px-3 py-2.5"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-medium">{t.title}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {scheduleLabel(t)}
-                    {!t.isActive && " · пауза"}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  <TemplateFormDrawer
-                    template={t}
-                    skills={skills}
-                    trigger={
-                      <Button size="sm" variant="ghost" disabled={busy}>
-                        <Pencil className="size-3.5" />
-                        Изменить
-                      </Button>
-                    }
-                  />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() =>
-                      patchTemplate(t.id, { isActive: !t.isActive })
-                    }
-                  >
-                    {t.isActive ? "Пауза" : "Возобновить"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-muted-foreground"
-                    disabled={busy}
-                    onClick={() => archiveTemplate(t.id)}
-                  >
-                    Архив
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {archived.length > 0 && (
-          <details className="rounded-xl border px-3 text-sm">
-            <summary className="flex min-h-11 cursor-pointer items-center font-medium">
-              Архив ({archived.length})
-            </summary>
-            <ul className="flex flex-col gap-2 pb-3">
-              {archived.map((t) => (
-                <li
-                  key={t.id}
-                  data-archived-template
-                  className="flex flex-col gap-2 rounded-xl border bg-card px-3 py-2.5"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="truncate text-sm font-medium">{t.title}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {scheduleLabel(t)}
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Навык: {t.skillName}
-                  </p>
-                  {t.skillArchived ? (
-                    <p className="text-xs text-muted-foreground">
-                      Сначала восстановите связанный навык в разделе «Навыки».
-                    </p>
-                  ) : templateRename?.id === t.id ? (
-                    <div className="flex flex-col gap-2">
-                      <p className="text-xs text-destructive">
-                        Неархивный шаблон с таким названием уже существует.
-                      </p>
-                      <Input
-                        aria-label={`Новое название шаблона ${t.title}`}
-                        value={templateRename.value}
-                        maxLength={200}
-                        onChange={(event) =>
-                          setTemplateRename({ id: t.id, value: event.target.value })
-                        }
-                      />
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          disabled={busy || !templateRename.value.trim()}
-                          onClick={() => restoreTemplate(t, templateRename.value)}
-                        >
-                          Переименовать и восстановить
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={busy}
-                          onClick={() => setTemplateRename(null)}
-                        >
-                          Отмена
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="self-start"
-                      disabled={busy}
-                      onClick={() => restoreTemplate(t)}
-                    >
-                      <RotateCcw className="size-4" />
-                      Восстановить
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
       </section>
 
       <section className="flex flex-col gap-2">

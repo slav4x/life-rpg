@@ -55,7 +55,8 @@ export function BottomNav() {
           const active =
             item.href === "/"
               ? pathname === "/"
-              : pathname.startsWith(item.href);
+              : pathname.startsWith(item.href) ||
+                (item.href === "/profile" && pathname.startsWith("/repetitions"));
           const Icon = item.icon;
           const inner = (
             <span

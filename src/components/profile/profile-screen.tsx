@@ -1,4 +1,5 @@
-import { Check, Lock } from "lucide-react";
+import { Check, ChevronRight, Lock, Repeat2 } from "lucide-react";
+import Link from "next/link";
 
 import type { ProfileData } from "@/application/profile/get-profile";
 import { Badge } from "@/components/ui/badge";
@@ -141,11 +142,24 @@ export function ProfileScreen({
         </div>
       </section>
 
-      <ProfileSettings
-        timezone={timezone}
-        templates={data.templates}
-        skills={data.skills}
-      />
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-medium">Управление</h2>
+        <Link
+          href="/repetitions"
+          className="flex min-h-14 items-center gap-3 rounded-xl border bg-card px-3 py-2.5"
+        >
+          <Repeat2 className="size-5 text-muted-foreground" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">Повторения</span>
+            <span className="block text-xs text-muted-foreground">
+              Расписание, пауза и архив
+            </span>
+          </span>
+          <ChevronRight className="size-4 text-muted-foreground" />
+        </Link>
+      </section>
+
+      <ProfileSettings timezone={timezone} />
     </div>
   );
 }

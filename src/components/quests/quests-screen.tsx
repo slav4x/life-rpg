@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -28,12 +27,20 @@ function formatDate(date: string): string {
   return new Intl.DateTimeFormat("ru-RU").format(new Date(`${date}T00:00:00`));
 }
 
-function QuestCard({ quest, today }: { quest: QuestVM; today: string }) {
+function QuestCard({
+  quest,
+  today,
+  listQuery,
+}: {
+  quest: QuestVM;
+  today: string;
+  listQuery: string;
+}) {
   const overdue = quest.status === "active" && Boolean(quest.dueDate) && quest.dueDate! < today;
 
   return (
     <Link
-      href={`/quests/${quest.id}`}
+      href={`/quests/${quest.id}${listQuery ? `?${listQuery}` : ""}`}
       className="flex flex-col gap-2 rounded-xl border bg-card px-3 py-3"
     >
       <div className="flex items-start justify-between gap-2">
@@ -87,10 +94,12 @@ function QuestList({
   items,
   empty,
   today,
+  listQuery,
 }: {
   items: QuestVM[];
   empty: string;
   today: string;
+  listQuery: string;
 }) {
   if (items.length === 0) {
     return (
@@ -102,7 +111,12 @@ function QuestList({
   return (
     <div className="flex flex-col gap-2">
       {items.map((quest) => (
-        <QuestCard key={quest.id} quest={quest} today={today} />
+        <QuestCard
+          key={quest.id}
+          quest={quest}
+          today={today}
+          listQuery={listQuery}
+        />
       ))}
     </div>
   );
@@ -125,10 +139,16 @@ export function QuestsScreen({
       : "active";
   const requestedType = searchParams.get("type");
   const urlType = requestedType && isQuestType(requestedType) ? requestedType : "all";
+  const requestedAttribute = searchParams.get("attribute");
+  const attributeFilter = attributes.some(
+    (attribute) => attribute.name === requestedAttribute,
+  )
+    ? requestedAttribute!
+    : "all";
   const activeTab = urlTab;
   const typeFilter = urlType;
-  const [query, setQuery] = useState("");
-  const [attributeFilter, setAttributeFilter] = useState("all");
+  const query = searchParams.get("q") ?? "";
+  const listQuery = searchParams.toString();
   const normalizedQuery = query.trim().toLocaleLowerCase("ru-RU");
 
   const filtered = quests.filter(
@@ -151,13 +171,26 @@ export function QuestsScreen({
   const completed = filtered.filter((quest) => quest.status === "completed");
   const archived = filtered.filter((quest) => quest.status === "archived");
 
-  function replaceQuery(patch: { tab?: string; type?: string }) {
-    const params = new URLSearchParams(window.location.search);
-    if (patch.tab) params.set("tab", patch.tab);
-    else if (!params.has("tab")) params.set("tab", activeTab);
-    if (patch.type === "all") params.delete("type");
-    else if (patch.type) params.set("type", patch.type);
-    window.history.replaceState(null, "", `/quests?${params.toString()}`);
+  function replaceQuery(patch: {
+    tab?: string;
+    type?: string;
+    q?: string;
+    attribute?: string;
+  }) {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(patch)) {
+      if (!value || value === "all" || (key === "tab" && value === "active")) {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+    }
+    const queryString = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      queryString ? `/quests?${queryString}` : "/quests",
+    );
   }
 
   return (
@@ -172,7 +205,7 @@ export function QuestsScreen({
         aria-label="Поиск квестов"
         placeholder="Поиск квестов"
         value={query}
-        onChange={(event) => setQuery(event.target.value)}
+        onChange={(event) => replaceQuery({ q: event.target.value })}
       />
 
       <div className="grid grid-cols-2 gap-2">
@@ -192,7 +225,10 @@ export function QuestsScreen({
             ))}
           </SelectContent>
         </Select>
-        <Select value={attributeFilter} onValueChange={setAttributeFilter}>
+        <Select
+          value={attributeFilter}
+          onValueChange={(value) => replaceQuery({ attribute: value })}
+        >
           <SelectTrigger aria-label="Фильтр квестов по характеристике">
             <SelectValue />
           </SelectTrigger>
@@ -223,13 +259,28 @@ export function QuestsScreen({
           </TabsTrigger>
         </TabsList>
         <TabsContent value="active" className="mt-3">
-          <QuestList items={active} empty="Нет активных квестов этого типа." today={today} />
+          <QuestList
+            items={active}
+            empty="Нет активных квестов этого типа."
+            today={today}
+            listQuery={listQuery}
+          />
         </TabsContent>
         <TabsContent value="completed" className="mt-3">
-          <QuestList items={completed} empty="Пока ничего не завершено." today={today} />
+          <QuestList
+            items={completed}
+            empty="Пока ничего не завершено."
+            today={today}
+            listQuery={listQuery}
+          />
         </TabsContent>
         <TabsContent value="archived" className="mt-3">
-          <QuestList items={archived} empty="Архив пуст." today={today} />
+          <QuestList
+            items={archived}
+            empty="Архив пуст."
+            today={today}
+            listQuery={listQuery}
+          />
         </TabsContent>
       </Tabs>
     </div>
